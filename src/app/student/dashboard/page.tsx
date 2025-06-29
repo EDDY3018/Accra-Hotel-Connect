@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bell, FileWarning, BedDouble } from "lucide-react";
@@ -10,8 +11,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const announcements: any[] = [];
 
+interface RoomInfo {
+  id: string;
+  name: string;
+}
+
+interface PaymentInfo {
+  balance: number;
+  dueDate: string;
+}
+
 export default function StudentDashboardPage() {
   const [userName, setUserName] = useState('');
+  const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
+  const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -22,8 +35,32 @@ export default function StudentDashboardPage() {
           const userDocRef = doc(db, 'users', user.uid);
           const userDoc = await getDoc(userDocRef);
           if (userDoc.exists()) {
-            const fullName = userDoc.data().fullName || '';
+            const userData = userDoc.data();
+            const fullName = userData.fullName || '';
             setUserName(fullName.split(' ')[0]);
+
+            // Fetch room info if roomId exists
+            if (userData.roomId) {
+              const roomDocRef = doc(db, 'rooms', userData.roomId);
+              const roomDoc = await getDoc(roomDocRef);
+              if (roomDoc.exists()) {
+                const roomData = roomDoc.data();
+                setRoomInfo({
+                  id: roomDoc.id,
+                  name: roomData.name || 'Room details not found'
+                });
+              }
+            }
+
+            // Set payment info if it exists
+            if (userData.outstandingBalance && userData.outstandingBalance > 0) {
+              setPaymentInfo({
+                balance: userData.outstandingBalance,
+                dueDate: userData.dueDate || 'Not specified'
+              });
+            } else {
+              setPaymentInfo(null);
+            }
           }
         } catch (error) {
             console.error("Error fetching user data:", error);
@@ -31,13 +68,10 @@ export default function StudentDashboardPage() {
             setIsLoading(false);
         }
       } else {
-        // Handle case where user is not logged in or auth state is not yet available
-        // For now, we'll just stop loading. A listener would be more robust.
         setIsLoading(false);
       }
     };
 
-    // Use onAuthStateChanged for robustness
     const unsubscribe = auth.onAuthStateChanged(user => {
         if (user) {
             fetchUserData();
@@ -62,22 +96,55 @@ export default function StudentDashboardPage() {
             <CardDescription>Here's a summary of your stay.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-3 mb-2">
-                <BedDouble className="w-6 h-6 text-primary" />
-                <h3 className="font-semibold">Your Room</h3>
+            <div className="p-4 bg-muted/50 rounded-lg flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <BedDouble className="w-6 h-6 text-primary" />
+                  <h3 className="font-semibold">Your Room</h3>
+                </div>
+                {isLoading ? (
+                  <>
+                    <Skeleton className="h-7 w-20 mb-2" />
+                    <Skeleton className="h-4 w-32" />
+                  </>
+                ) : roomInfo ? (
+                  <>
+                    <p className="text-2xl font-bold">{roomInfo.id}</p>
+                    <p className="text-sm text-muted-foreground">{roomInfo.name}</p>
+                  </>
+                ) : (
+                    <p className="text-sm text-muted-foreground py-2">No room has been assigned to you yet.</p>
+                )}
               </div>
-              <p className="text-2xl font-bold">B203</p>
-              <p className="text-sm text-muted-foreground">Deluxe Single Room</p>
+              {!isLoading && !roomInfo && (
+                  <Button size="sm" asChild className="mt-auto w-fit">
+                    <Link href="/student/rooms">Browse Rooms</Link>
+                  </Button>
+              )}
             </div>
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-3 mb-2">
-                <FileWarning className="w-6 h-6 text-destructive" />
-                <h3 className="font-semibold">Outstanding Balance</h3>
+            <div className="p-4 bg-muted/50 rounded-lg flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <FileWarning className="w-6 h-6 text-destructive" />
+                  <h3 className="font-semibold">Outstanding Balance</h3>
+                </div>
+                {isLoading ? (
+                  <>
+                    <Skeleton className="h-7 w-28 mb-2" />
+                    <Skeleton className="h-4 w-24" />
+                  </>
+                ) : paymentInfo && paymentInfo.balance > 0 ? (
+                  <>
+                    <p className="text-2xl font-bold">GHS {paymentInfo.balance.toFixed(2)}</p>
+                    <p className="text-sm text-muted-foreground">Due: {paymentInfo.dueDate}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-2">You have no outstanding balance. Great job!</p>
+                )}
               </div>
-              <p className="text-2xl font-bold">GHS 500.00</p>
-              <p className="text-sm text-muted-foreground">Due: 2024-06-01</p>
-              <Button size="sm" className="mt-2">Pay Now</Button>
+               {!isLoading && paymentInfo && paymentInfo.balance > 0 && (
+                  <Button size="sm" className="mt-auto w-fit">Pay Now</Button>
+               )}
             </div>
           </CardContent>
         </Card>
