@@ -1,0 +1,76 @@
+import Link from "next/link"
+import Image from "next/image"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Search } from "lucide-react"
+
+const rooms = [
+  { id: "1", name: "Standard Single Room", price: 5000, image: "https://placehold.co/600x400.png", hint: "cozy room", status: "Available", type: "Standard", amenities: ["Bed", "Desk", "Wardrobe", "Shared Bathroom"] },
+  { id: "2", name: "Deluxe Single Room", price: 7500, image: "https://placehold.co/600x400.png", hint: "modern apartment", status: "Available", type: "Deluxe", amenities: ["Bed", "Desk", "Wardrobe", "Private Bathroom", "A/C"] },
+  { id: "3", name: "Standard Double Room", price: 4500, image: "https://placehold.co/600x400.png", hint: "shared room", status: "1 Spot Left", type: "Standard", amenities: ["Bunk Bed", "Desk", "Wardrobe", "Shared Bathroom"] },
+  { id: "4", name: "Executive Suite", price: 10000, image: "https://placehold.co/600x400.png", hint: "luxury suite", status: "Occupied", type: "Suite", amenities: ["Queen Bed", "Desk", "Wardrobe", "Private Bathroom", "A/C", "Kitchenette"] },
+  { id: "5", name: "Standard Single Room", price: 5000, image: "https://placehold.co/600x400.png", hint: "student room", status: "Available", type: "Standard", amenities: ["Bed", "Desk", "Wardrobe", "Shared Bathroom"] },
+  { id: "6", name: "Deluxe Double Room", price: 6500, image: "https://placehold.co/600x400.png", hint: "spacious room", status: "Available", type: "Deluxe", amenities: ["Two Beds", "Desk", "Wardrobe", "Private Bathroom", "A/C"] },
+];
+
+export default function RoomsPage() {
+  return (
+    <>
+        <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
+            <div>
+                <h1 className="text-3xl font-bold font-headline">Available Rooms</h1>
+                <p className="text-muted-foreground">Browse and find the perfect room for your stay.</p>
+            </div>
+            <div className="flex w-full md:w-auto items-center gap-2">
+                 <div className="relative flex-1 md:flex-initial">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search rooms..." className="pl-8" />
+                </div>
+                 <Select>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="standard">Standard</SelectItem>
+                        <SelectItem value="deluxe">Deluxe</SelectItem>
+                        <SelectItem value="suite">Suite</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {rooms.map(room => (
+                <Card key={room.id} className="overflow-hidden flex flex-col">
+                    <CardHeader className="p-0 relative">
+                         <Badge className="absolute top-2 right-2" variant={room.status === 'Available' ? 'default' : room.status.includes('Spot') ? 'default': 'secondary'}>
+                            {room.status}
+                        </Badge>
+                        <Image
+                            src={room.image}
+                            alt={room.name}
+                            width={600}
+                            height={400}
+                            className="aspect-video object-cover"
+                            data-ai-hint={room.hint}
+                        />
+                    </CardHeader>
+                    <CardContent className="pt-6 flex-1">
+                        <CardTitle className="font-headline text-xl mb-2">{room.name}</CardTitle>
+                        <CardDescription>{room.amenities.slice(0, 4).join(', ')}...</CardDescription>
+                    </CardContent>
+                    <CardFooter className="flex justify-between items-center">
+                        <p className="font-semibold text-lg">GHS {room.price}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
+                        <Button asChild disabled={room.status === 'Occupied'}>
+                            <Link href={`/rooms/${room.id}`}>View Details</Link>
+                        </Button>
+                    </CardFooter>
+                </Card>
+            ))}
+        </div>
+    </>
+  )
+}
