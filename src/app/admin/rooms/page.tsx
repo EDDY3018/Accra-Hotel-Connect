@@ -1,10 +1,11 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import React, { useState, useEffect, useRef } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import Image from 'next/image';
 import { auth, db } from '@/lib/firebase';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -26,7 +27,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, PlusCircle, Trash, Upload, Wifi, Wind, Tv, Zap, Bath } from "lucide-react";
+import { Edit, PlusCircle, Trash, Upload, Wifi, Wind, Tv, Zap, Bath, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -58,9 +59,10 @@ const formSchema = z.object({
   occupancy: z.string({ required_error: 'Please select an occupancy level.' }),
   description: z.string().min(10, 'Description must be at least 10 characters long.'),
   amenities: z.array(z.string()).optional(),
-  images: z.custom<FileList>()
-    .refine((files) => files && files.length === 4, `You must upload exactly 4 images.`)
-    .refine((files) => files && Array.from(files).every(file => file.size <= 1024 * 1024), `Each image must be less than 1MB.`),
+  images: z.array(z.instanceof(File))
+    .min(4, 'You must upload exactly 4 images.')
+    .max(4, 'You must upload exactly 4 images.')
+    .refine((files) => files.every(file => file.size <= 1024 * 1024), `Each image must be less than 1MB.`),
 });
 
 export default function AdminRoomsPage() {
@@ -69,6 +71,8 @@ export default function AdminRoomsPage() {
   const [managerInfo, setManagerInfo] = useState<{ hostelName: string; location: string; phone: string } | null>(null);
   const [rooms, setRooms] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -77,6 +81,7 @@ export default function AdminRoomsPage() {
       price: 0,
       description: '',
       amenities: [],
+      images: [],
     },
   });
 
@@ -89,7 +94,6 @@ export default function AdminRoomsPage() {
     }
 
     try {
-      // Fetch manager info
       const userDocRef = doc(db, 'users', user.uid);
       const userDocSnap = await getDoc(userDocRef);
       if (userDocSnap.exists()) {
@@ -101,7 +105,6 @@ export default function AdminRoomsPage() {
         });
       }
 
-      // Fetch rooms created by this manager
       const roomsQuery = query(collection(db, 'rooms'), where('managerUid', '==', user.uid));
       const querySnapshot = await getDocs(roomsQuery);
       const fetchedRooms = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -125,6 +128,41 @@ export default function AdminRoomsPage() {
     return () => unsubscribe();
   }, []);
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const fileArray = Array.from(files);
+      form.setValue('images', fileArray, { shouldValidate: true });
+      
+      imagePreviews.forEach(url => URL.revokeObjectURL(url));
+      const newPreviews = fileArray.map(file => URL.createObjectURL(file));
+      setImagePreviews(newPreviews);
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    URL.revokeObjectURL(imagePreviews[index]);
+    
+    const newPreviews = [...imagePreviews];
+    newPreviews.splice(index, 1);
+    setImagePreviews(newPreviews);
+
+    const currentFiles = form.getValues('images') || [];
+    const newFiles = [...currentFiles];
+    newFiles.splice(index, 1);
+    form.setValue('images', newFiles, { shouldValidate: true });
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+  
+  useEffect(() => {
+    return () => {
+      imagePreviews.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [imagePreviews]);
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     const user = auth.currentUser;
     if (!user || !managerInfo) {
@@ -133,7 +171,6 @@ export default function AdminRoomsPage() {
     }
 
     try {
-      // 1. Upload images
       const storage = getStorage();
       const imageUrls: { src: string; hint: string }[] = [];
       const imageHints = ["room angle one", "room angle two", "room angle three", "bathroom"];
@@ -146,7 +183,6 @@ export default function AdminRoomsPage() {
         imageUrls.push({ src: url, hint: imageHints[i] || "room interior" });
       }
 
-      // 2. Prepare data for Firestore
       const roomData = {
         managerUid: user.uid,
         hostelName: managerInfo.hostelName,
@@ -163,13 +199,13 @@ export default function AdminRoomsPage() {
         createdAt: new Date().toISOString(),
       };
 
-      // 3. Add doc to Firestore
       await addDoc(collection(db, 'rooms'), roomData);
 
       toast({ title: 'Room Added!', description: 'The new room has been saved successfully.' });
       form.reset();
+      setImagePreviews([]);
       setIsDialogOpen(false);
-      fetchManagerAndRooms(); // Refresh the list
+      fetchManagerAndRooms();
     } catch (error) {
       console.error("Error adding room: ", error);
       toast({ variant: 'destructive', title: 'Submission Error', description: 'Could not save the room. Please try again.' });
@@ -200,20 +236,48 @@ export default function AdminRoomsPage() {
                   <FormField
                     control={form.control}
                     name="images"
-                    render={({ field }) => (
+                    render={() => (
                       <FormItem>
                         <FormLabel>Room Images (must be 4)</FormLabel>
                         <FormControl>
-                          <div className="flex items-center justify-center w-full">
-                            <label htmlFor="room-images-input" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted">
-                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
-                                <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                <p className="text-xs text-muted-foreground">4 images required (3 room, 1 bath), PNG/JPG up to 1MB each</p>
+                          <>
+                            {imagePreviews.length > 0 && (
+                              <div className="grid grid-cols-4 gap-2 mb-4">
+                                {imagePreviews.map((src, index) => (
+                                  <div key={src} className="relative aspect-square">
+                                    <Image src={src} alt={`Preview ${index + 1}`} fill className="object-cover rounded-md" />
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="icon"
+                                      className="absolute top-1 right-1 h-6 w-6 rounded-full"
+                                      onClick={() => handleRemoveImage(index)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
                               </div>
-                              <Input id="room-images-input" type="file" className="hidden" multiple accept="image/png, image/jpeg" onChange={(e) => field.onChange(e.target.files)} />
-                            </label>
-                          </div>
+                            )}
+                            <div className="flex items-center justify-center w-full">
+                              <label htmlFor="room-images-input" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                  <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
+                                  <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                                  <p className="text-xs text-muted-foreground">4 images required (3 room, 1 bath), PNG/JPG up to 1MB each</p>
+                                </div>
+                                <Input
+                                  id="room-images-input"
+                                  ref={fileInputRef}
+                                  type="file"
+                                  className="hidden"
+                                  multiple
+                                  accept="image/png, image/jpeg"
+                                  onChange={handleFileChange}
+                                />
+                              </label>
+                            </div>
+                          </>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
