@@ -38,6 +38,10 @@ export default function ManagerSignupPage() {
             <Input id="location" placeholder="e.g., East Legon, Accra" required />
           </div>
           <div className="grid gap-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input id="phone" type="tel" placeholder="+233 12 345 6789" required />
+          </div>
+          <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
