@@ -36,6 +36,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import imageCompression from 'browser-image-compression';
 
 
 const amenitiesList = [
@@ -55,7 +56,7 @@ const formSchema = z.object({
   images: z.array(z.instanceof(File))
     .min(4, 'You must upload exactly 4 images.')
     .max(4, 'You must upload exactly 4 images.')
-    .refine((files) => files.every(file => file.size <= 1024 * 1024), `Each image must be less than 1MB.`),
+    .refine((files) => files.every(file => file.size <= 5 * 1024 * 1024), `Each image must be less than 5MB.`),
 });
 
 export default function AdminRoomsPage() {
@@ -175,8 +176,18 @@ export default function AdminRoomsPage() {
       const storage = getStorage();
       const imageHints = ["room angle one", "room angle two", "room angle three", "bathroom"];
       
+      console.log("Compressing images...");
+      const compressionOptions = {
+        maxSizeMB: 0.5,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+      };
+      const compressedImagePromises = values.images.map(file => imageCompression(file, compressionOptions));
+      const compressedImages = await Promise.all(compressedImagePromises);
+      console.log("Image compression complete.");
+
       console.log("Starting image uploads...");
-      const uploadPromises = values.images.map((file, i) => {
+      const uploadPromises = compressedImages.map((file, i) => {
         const fileRef = storageRef(storage, `rooms/${user.uid}/${values.roomNumber}/${file.name}_${Date.now()}`);
         return uploadBytes(fileRef, file).then(snapshot => 
             getDownloadURL(snapshot.ref).then(url => ({
@@ -220,13 +231,13 @@ export default function AdminRoomsPage() {
       if (error.code) {
         switch (error.code) {
           case 'storage/unauthorized':
-            description = 'Permission denied. You are not authorized to upload images.';
+            description = 'Permission denied. You are not authorized to upload images. Check your Storage security rules.';
             break;
-          case 'storage/object-not-found':
-            description = 'An error occurred during upload. File not found.';
+          case 'storage/retry-limit-exceeded':
+            description = 'Network timeout. Please check your internet connection and Storage rules.';
             break;
-          case 'firebase/permission-denied':
-             description = 'Permission denied. You cannot save data to the database.';
+          case 'firestore/permission-denied':
+             description = 'Permission denied. You cannot save data to the database. Check your Firestore security rules.';
             break;
           default:
             description = `An unexpected error occurred: ${error.message}`;
@@ -333,7 +344,7 @@ export default function AdminRoomsPage() {
                                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                     <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
                                     <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                    <p className="text-xs text-muted-foreground">4 images required (3 room, 1 bath), PNG, JPG, or JPEG up to 1MB each</p>
+                                    <p className="text-xs text-muted-foreground">4 images required (3 room, 1 bath), PNG, JPG, or JPEG up to 5MB each</p>
                                     </div>
                                     <Input
                                     id="room-images-input"
