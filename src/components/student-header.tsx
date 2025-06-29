@@ -19,10 +19,10 @@ import { HostelIcon } from "./icons";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-    { href: "/dashboard", icon: Home, label: "Dashboard" },
-    { href: "/rooms", icon: BedDouble, label: "Rooms" },
-    { href: "/payments", icon: Wallet, label: "Payments" },
-    { href: "/support", icon: LifeBuoy, label: "Support" },
+    { href: "/student/dashboard", icon: Home, label: "Dashboard" },
+    { href: "/student/rooms", icon: BedDouble, label: "Rooms" },
+    { href: "/student/payments", icon: Wallet, label: "Payments" },
+    { href: "/student/support", icon: LifeBuoy, label: "Support" },
 ];
 
 export function StudentHeader() {
@@ -32,7 +32,7 @@ export function StudentHeader() {
     <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 z-50">
       <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
         <Link
-          href="/dashboard"
+          href="/student/dashboard"
           className="flex items-center gap-2 text-lg font-semibold md:text-base"
         >
           <HostelIcon className="h-6 w-6 text-primary" />

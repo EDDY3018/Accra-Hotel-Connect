@@ -65,7 +65,7 @@ export default function RoomsPage() {
                     <CardFooter className="flex justify-between items-center">
                         <p className="font-semibold text-lg">GHS {room.price}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
                         <Button asChild disabled={room.status === 'Occupied'}>
-                            <Link href={`/rooms/${room.id}`}>View Details</Link>
+                            <Link href={`/student/rooms/${room.id}`}>View Details</Link>
                         </Button>
                     </CardFooter>
                 </Card>
