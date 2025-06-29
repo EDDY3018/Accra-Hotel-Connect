@@ -30,6 +30,7 @@ import { Edit, PlusCircle, Trash, Upload, Wifi, Wind, Tv, Zap, Bath } from "luci
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
