@@ -1,3 +1,4 @@
+
 import Link from "next/link"
 import Image from "next/image"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -6,38 +7,36 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search } from "lucide-react"
-import { collection, getDocs } from "firebase/firestore"
+import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 interface Room {
     id: string;
     name: string;
     price: number;
-    image: string;
-    hint: string;
+    images: { src: string; hint: string }[];
     status: 'Available' | 'Occupied' | '1 Spot Left';
-    type: 'Standard' | 'Deluxe' | 'Suite';
     amenities: string[];
 }
 
 async function getRooms(): Promise<Room[]> {
     try {
-        const roomsCol = collection(db, 'rooms');
-        const roomSnapshot = await getDocs(roomsCol);
+        const roomsQuery = query(collection(db, 'rooms'), where('status', '==', 'Available'));
+        const roomSnapshot = await getDocs(roomsQuery);
+
         if (roomSnapshot.empty) {
-            console.log("No rooms found in Firestore. Returning empty array.");
+            console.log("No available rooms found in Firestore.");
             return [];
         }
+
         const roomList = roomSnapshot.docs.map(doc => {
             const data = doc.data();
             return {
                 id: doc.id,
                 name: data.name || "Unnamed Room",
                 price: data.price || 0,
-                image: data.image || "https://placehold.co/600x400.png",
-                hint: data.hint || "room",
+                images: data.images && data.images.length > 0 ? data.images : [{ src: "https://placehold.co/600x400.png", hint: "hostel room" }],
                 status: data.status || "Available",
-                type: data.type || "Standard",
                 amenities: data.amenities || [],
             } as Room;
         });
@@ -70,9 +69,10 @@ export default async function RoomsPage() {
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="standard">Standard</SelectItem>
-                        <SelectItem value="deluxe">Deluxe</SelectItem>
-                        <SelectItem value="suite">Suite</SelectItem>
+                        <SelectItem value="1">1 in a room</SelectItem>
+                        <SelectItem value="2">2 in a room</SelectItem>
+                        <SelectItem value="3">3 in a room</SelectItem>
+                        <SelectItem value="4">4 in a room</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -86,21 +86,21 @@ export default async function RoomsPage() {
                 {rooms.map(room => (
                     <Card key={room.id} className="overflow-hidden flex flex-col">
                         <CardHeader className="p-0 relative">
-                             <Badge className="absolute top-2 right-2" variant={room.status === 'Available' ? 'default' : room.status.includes('Spot') ? 'default': 'secondary'}>
+                             <Badge className="absolute top-2 right-2" variant={room.status === 'Available' ? 'default' : 'secondary'}>
                                 {room.status}
                             </Badge>
                             <Image
-                                src={room.image}
+                                src={room.images[0].src}
                                 alt={room.name}
                                 width={600}
                                 height={400}
                                 className="aspect-video object-cover"
-                                data-ai-hint={room.hint}
+                                data-ai-hint={room.images[0].hint}
                             />
                         </CardHeader>
                         <CardContent className="pt-6 flex-1">
                             <CardTitle className="font-headline text-xl mb-2">{room.name}</CardTitle>
-                            <CardDescription>{room.amenities.slice(0, 4).join(', ')}...</CardDescription>
+                            <CardDescription>{room.amenities.join(', ')}</CardDescription>
                         </CardContent>
                         <CardFooter className="flex justify-between items-center">
                             <p className="font-semibold text-lg">GHS {room.price}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
