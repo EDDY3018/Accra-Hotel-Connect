@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -129,14 +128,25 @@ export default function AdminRoomsPage() {
   }, []);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files) {
-      const fileArray = Array.from(files);
-      form.setValue('images', fileArray, { shouldValidate: true });
+    const newFiles = event.target.files;
+    if (newFiles) {
+      const currentFiles = form.getValues('images') || [];
+      const combinedFiles = [...currentFiles, ...Array.from(newFiles)];
       
-      imagePreviews.forEach(url => URL.revokeObjectURL(url));
-      const newPreviews = fileArray.map(file => URL.createObjectURL(file));
+      const limitedFiles = combinedFiles.slice(0, 4); // Limit to a max of 4 images
+
+      form.setValue('images', limitedFiles, { shouldValidate: true });
+      
+      // Create new object URLs for the updated list of files.
+      // The existing useEffect hook will handle revoking old URLs.
+      const newPreviews = limitedFiles.map(file => URL.createObjectURL(file));
       setImagePreviews(newPreviews);
+      
+      // Clear the file input value. This is important to allow re-selecting the same file
+      // if the user removes it and then wants to add it back.
+      if (event.target) {
+        event.target.value = "";
+      }
     }
   };
 
@@ -158,6 +168,7 @@ export default function AdminRoomsPage() {
   };
   
   useEffect(() => {
+    // When the component unmounts or imagePreviews change, revoke the object URLs to avoid memory leaks.
     return () => {
       imagePreviews.forEach(url => URL.revokeObjectURL(url));
     };
