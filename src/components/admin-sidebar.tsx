@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import {
   Bell,
   Home,
@@ -33,6 +34,11 @@ import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { Skeleton } from "./ui/skeleton";
+
 
 const adminNavItems = [
   { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -47,11 +53,52 @@ export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
+  
+  const [userName, setUserName] = useState("Manager");
+  const [userEmail, setUserEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleLogout = () => {
-    // Note: No real auth for admin, just a redirect
-    toast({ title: "Logged Out", description: "You have been logged out successfully." });
-    router.push("/auth/login");
+  useEffect(() => {
+    setIsLoading(true);
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        // A real user (manager) is logged in
+        const userDocRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          const userData = docSnap.data();
+          setUserName(userData.fullName || "Hostel Manager");
+          setUserEmail(userData.email || "");
+        } else {
+          // User exists in auth but not in firestore? Fallback.
+          setUserName("Hostel Manager");
+          setUserEmail(user.email || "");
+        }
+        setIsLoading(false);
+      } else {
+        // No user logged in, assume it's the hardcoded admin
+        setUserName("Admin User");
+        setUserEmail("admin@hostel.com");
+        setIsLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    if (auth.currentUser) {
+        try {
+            await signOut(auth);
+            toast({ title: "Logged Out", description: "You have been logged out successfully." });
+            router.push("/");
+        } catch (error) {
+            toast({ variant: "destructive", title: "Logout Failed", description: "An error occurred while logging out." });
+        }
+    } else {
+        // It's the fake admin, just redirect
+        toast({ title: "Logged Out", description: "You have been logged out successfully." });
+        router.push("/");
+    }
   };
   
   return (
@@ -83,21 +130,28 @@ export function AdminSidebar() {
                 <Button variant="ghost" className="flex items-center justify-start gap-3 p-2 h-auto w-full">
                     <Avatar>
                         <AvatarImage src="https://placehold.co/40x40" />
-                        <AvatarFallback>AD</AvatarFallback>
+                        <AvatarFallback>{userName?.slice(0,2).toUpperCase()}</AvatarFallback>
                     </Avatar>
-                    <div className="flex flex-col items-start">
-                        <span className="font-semibold text-sm">Admin User</span>
-                        <span className="text-xs text-muted-foreground">admin@hostel.com</span>
-                    </div>
+                     {isLoading ? (
+                        <div className="space-y-1">
+                            <Skeleton className="h-4 w-24" />
+                            <Skeleton className="h-3 w-32" />
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-start">
+                            <span className="font-semibold text-sm">{userName}</span>
+                            <span className="text-xs text-muted-foreground">{userEmail}</span>
+                        </div>
+                    )}
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56 mb-2" align="end">
-                <DropdownMenuLabel>Admin Account</DropdownMenuLabel>
+                <DropdownMenuLabel>Manager Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                  <Link href="/admin/settings">
                     <DropdownMenuItem>
                         <Settings className="mr-2 h-4 w-4" />
-                        <span>Settings</span>
+                        <span>Profile & Settings</span>
                     </DropdownMenuItem>
                  </Link>
                 <DropdownMenuSeparator />
