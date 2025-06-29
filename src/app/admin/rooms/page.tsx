@@ -23,19 +23,11 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit, PlusCircle, Trash, Upload, Wifi, Wind, Tv, Zap, Bath, X } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,6 +35,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
+
 
 const amenitiesList = [
     { id: 'wifi', label: 'Wi-Fi', icon: Wifi },
@@ -66,7 +60,7 @@ const formSchema = z.object({
 
 export default function AdminRoomsPage() {
   const { toast } = useToast();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormVisible, setIsFormVisible] = useState(false);
   const [managerInfo, setManagerInfo] = useState<{ hostelName: string; location: string; phone: string } | null>(null);
   const [rooms, setRooms] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -213,7 +207,7 @@ export default function AdminRoomsPage() {
       toast({ title: 'Room Added!', description: 'The new room has been saved successfully.' });
       form.reset();
       setImagePreviews([]);
-      setIsDialogOpen(false);
+      setIsFormVisible(false);
       fetchManagerAndRooms();
     } catch (error) {
       console.error("Error adding room: ", error);
@@ -224,161 +218,172 @@ export default function AdminRoomsPage() {
   const { isSubmitting } = form.formState;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle className="font-headline">Rooms</CardTitle>
-            <CardDescription>Manage hostel rooms and their availability.</CardDescription>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="font-headline">Rooms</CardTitle>
+              <CardDescription>Manage hostel rooms and their availability.</CardDescription>
+            </div>
+            <Button onClick={() => setIsFormVisible(!isFormVisible)}>
+              {isFormVisible ? <X className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+              {isFormVisible ? 'Cancel' : 'Add Room'}
+            </Button>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button><PlusCircle className="mr-2 h-4 w-4" /> Add Room</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Add New Room</DialogTitle>
-                <DialogDescription>Fill in the details to add a new room to the system.</DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6 py-4 max-h-[80vh] overflow-y-auto pr-4">
-                  <FormField
-                    control={form.control}
-                    name="images"
-                    render={() => (
-                      <FormItem>
-                        <FormLabel>Room Images (must be 4)</FormLabel>
-                        <FormControl>
-                          <div>
-                            {imagePreviews.length > 0 && (
-                              <div className="grid grid-cols-4 gap-2 mb-4">
-                                {imagePreviews.map((src, index) => (
-                                  <div key={src} className="relative aspect-square">
-                                    <Image src={src} alt={`Preview ${index + 1}`} fill className="object-cover rounded-md" />
-                                    <Button
-                                      type="button"
-                                      variant="destructive"
-                                      size="icon"
-                                      className="absolute top-1 right-1 h-6 w-6 rounded-full"
-                                      onClick={() => handleRemoveImage(index)}
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            <div className="flex items-center justify-center w-full">
-                              <label htmlFor="room-images-input" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted">
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                  <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
-                                  <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                  <p className="text-xs text-muted-foreground">4 images required (3 room, 1 bath), PNG/JPG up to 1MB each</p>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Room No.</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Price/Year</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow><TableCell colSpan={5} className="h-24 text-center"><Skeleton className="w-full h-8" /></TableCell></TableRow>
+              ) : rooms.length === 0 ? (
+                <TableRow><TableCell colSpan={5} className="text-center">No rooms found. Add a room to get started.</TableCell></TableRow>
+              ) : (
+                rooms.map((room) => (
+                  <TableRow key={room.id}>
+                    <TableCell className="font-medium">{room.roomNumber}</TableCell>
+                    <TableCell>{room.name}</TableCell>
+                    <TableCell>GHS {room.price}</TableCell>
+                    <TableCell>
+                      <Badge variant={room.status === "Occupied" ? "secondary" : room.status === "Available" ? "default" : "destructive"}>{room.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="icon"><Edit className="h-4 w-4" /></Button>
+                        <Button variant="destructive" size="icon"><Trash className="h-4 w-4" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      
+      <Collapsible open={isFormVisible} className="mt-6">
+        <CollapsibleContent>
+            <Card className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+                <CardHeader>
+                    <CardTitle>Add New Room</CardTitle>
+                    <CardDescription>Fill in the details to add a new room to the system.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6 py-4">
+                    <FormField
+                        control={form.control}
+                        name="images"
+                        render={() => (
+                        <FormItem>
+                            <FormLabel>Room Images (must be 4)</FormLabel>
+                            <FormControl>
+                            <div>
+                                {imagePreviews.length > 0 && (
+                                <div className="grid grid-cols-4 gap-2 mb-4">
+                                    {imagePreviews.map((src, index) => (
+                                    <div key={src} className="relative aspect-square">
+                                        <Image src={src} alt={`Preview ${index + 1}`} fill className="object-cover rounded-md" />
+                                        <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="icon"
+                                        className="absolute top-1 right-1 h-6 w-6 rounded-full"
+                                        onClick={() => handleRemoveImage(index)}
+                                        >
+                                        <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    ))}
                                 </div>
-                                <Input
-                                  id="room-images-input"
-                                  ref={fileInputRef}
-                                  type="file"
-                                  className="hidden"
-                                  multiple
-                                  accept="image/png, image/jpeg"
-                                  onChange={handleFileChange}
-                                />
-                              </label>
+                                )}
+                                <div className="flex items-center justify-center w-full">
+                                <label htmlFor="room-images-input" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted">
+                                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                    <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
+                                    <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                                    <p className="text-xs text-muted-foreground">4 images required (3 room, 1 bath), PNG/JPG up to 1MB each</p>
+                                    </div>
+                                    <Input
+                                    id="room-images-input"
+                                    ref={fileInputRef}
+                                    type="file"
+                                    className="hidden"
+                                    multiple
+                                    accept="image/png, image/jpeg"
+                                    onChange={handleFileChange}
+                                    />
+                                </label>
+                                </div>
                             </div>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="roomNumber" render={({ field }) => (
-                      <FormItem><FormLabel>Room No.</FormLabel><FormControl><Input placeholder="e.g., E501" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="price" render={({ field }) => (
-                      <FormItem><FormLabel>Price (GHS/Year)</FormLabel><FormControl><Input type="number" placeholder="5000" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                  </div>
-                  <FormField control={form.control} name="occupancy" render={({ field }) => (
-                    <FormItem><FormLabel>Room Occupancy</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select occupancy" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="1 in a room">1 in a room</SelectItem>
-                          <SelectItem value="2 in a room">2 in a room</SelectItem>
-                          <SelectItem value="3 in a room">3 in a room</SelectItem>
-                          <SelectItem value="4 in a room">4 in a room</SelectItem>
-                          <SelectItem value="5 in a room">5 in a room</SelectItem>
-                          <SelectItem value="6 in a room">6 in a room</SelectItem>
-                        </SelectContent>
-                      </Select><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="description" render={({ field }) => (
-                    <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Describe the room and its amenities." {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="amenities" render={() => (
-                    <FormItem>
-                      <FormLabel>Amenities</FormLabel>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2">
-                        {amenitiesList.map((item) => (
-                          <FormField key={item.id} control={form.control} name="amenities" render={({ field }) => (
-                            <FormItem key={item.id} className="flex flex-row items-start space-x-3 space-y-0">
-                              <FormControl><Checkbox checked={field.value?.includes(item.id)} onCheckedChange={(checked) => {
-                                  return checked ? field.onChange([...(field.value || []), item.id]) : field.onChange(field.value?.filter((value) => value !== item.id))
-                              }} /></FormControl>
-                              <FormLabel className="font-normal flex items-center gap-2 cursor-pointer"><item.icon className="w-5 h-5 text-muted-foreground" /><span>{item.label}</span></FormLabel>
-                            </FormItem>
-                          )} />
-                        ))}
-                      </div><FormMessage /></FormItem>
-                  )} />
-                  <DialogFooter>
-                    <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Room'}</Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Room No.</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Price/Year</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow><TableCell colSpan={5} className="h-24 text-center"><Skeleton className="w-full h-8" /></TableCell></TableRow>
-            ) : rooms.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center">No rooms found. Add a room to get started.</TableCell></TableRow>
-            ) : (
-              rooms.map((room) => (
-                <TableRow key={room.id}>
-                  <TableCell className="font-medium">{room.roomNumber}</TableCell>
-                  <TableCell>{room.name}</TableCell>
-                  <TableCell>GHS {room.price}</TableCell>
-                  <TableCell>
-                    <Badge variant={room.status === "Occupied" ? "secondary" : room.status === "Available" ? "default" : "destructive"}>{room.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="icon"><Edit className="h-4 w-4" /></Button>
-                      <Button variant="destructive" size="icon"><Trash className="h-4 w-4" /></Button>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <FormField control={form.control} name="roomNumber" render={({ field }) => (
+                        <FormItem><FormLabel>Room No.</FormLabel><FormControl><Input placeholder="e.g., E501" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="price" render={({ field }) => (
+                        <FormItem><FormLabel>Price (GHS/Year)</FormLabel><FormControl><Input type="number" placeholder="5000" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+                    <FormField control={form.control} name="occupancy" render={({ field }) => (
+                        <FormItem><FormLabel>Room Occupancy</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select occupancy" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                            <SelectItem value="1 in a room">1 in a room</SelectItem>
+                            <SelectItem value="2 in a room">2 in a room</SelectItem>
+                            <SelectItem value="3 in a room">3 in a room</SelectItem>
+                            <SelectItem value="4 in a room">4 in a room</SelectItem>
+                            <SelectItem value="5 in a room">5 in a room</SelectItem>
+                            <SelectItem value="6 in a room">6 in a room</SelectItem>
+                            </SelectContent>
+                        </Select><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="description" render={({ field }) => (
+                        <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Describe the room and its amenities." {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="amenities" render={() => (
+                        <FormItem>
+                        <FormLabel>Amenities</FormLabel>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2">
+                            {amenitiesList.map((item) => (
+                            <FormField key={item.id} control={form.control} name="amenities" render={({ field }) => (
+                                <FormItem key={item.id} className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormControl><Checkbox checked={field.value?.includes(item.id)} onCheckedChange={(checked) => {
+                                    return checked ? field.onChange([...(field.value || []), item.id]) : field.onChange(field.value?.filter((value) => value !== item.id))
+                                }} /></FormControl>
+                                <FormLabel className="font-normal flex items-center gap-2 cursor-pointer"><item.icon className="w-5 h-5 text-muted-foreground" /><span>{item.label}</span></FormLabel>
+                                </FormItem>
+                            )} />
+                            ))}
+                        </div><FormMessage /></FormItem>
+                    )} />
+                    </form>
+                </Form>
+                </CardContent>
+                <CardFooter>
+                    <div className="flex justify-end gap-2 w-full">
+                        <Button variant="outline" onClick={() => setIsFormVisible(false)}>Cancel</Button>
+                        <Button type="submit" form="add-room-form" onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Room'}</Button>
+                    </div>
+                </CardFooter>
+            </Card>
+        </CollapsibleContent>
+      </Collapsible>
+    </>
   )
 }
