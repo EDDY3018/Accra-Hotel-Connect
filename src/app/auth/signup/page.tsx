@@ -108,7 +108,7 @@ export default function SignupPage() {
         }
       }
     } catch (error: any) {
-      console.error("Google Sign-Up Error:", error.code, error.message);
+      console.error("Full Google Sign-Up Error:", error);
       toast({ 
         variant: "destructive", 
         title: "Google Sign-Up Error", 

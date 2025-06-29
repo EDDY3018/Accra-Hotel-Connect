@@ -104,7 +104,7 @@ export default function LoginPage() {
         });
       }
     } catch (error: any) {
-      console.error("Google Login Error:", error.code, error.message);
+      console.error("Full Google Login Error:", error);
       toast({
         variant: "destructive",
         title: "Google Sign-In Error",
