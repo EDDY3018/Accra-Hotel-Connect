@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -139,10 +138,41 @@ export default function AdminSettingsPage() {
                         <Skeleton className="h-7 w-48" />
                         <Skeleton className="h-4 w-64" />
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <Skeleton className="h-10 w-full max-w-lg" />
-                        <Skeleton className="h-10 w-full max-w-lg" />
-                        <Skeleton className="h-10 w-full max-w-lg" />
+                    <CardContent className="space-y-6">
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-10 w-full max-w-lg" />
+                        </div>
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-10 w-full max-w-lg" />
+                        </div>
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-10 w-full max-w-lg" />
+                        </div>
+                        <Skeleton className="h-10 w-28 mt-4" />
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader>
+                        <Skeleton className="h-7 w-48" />
+                        <Skeleton className="h-4 w-64" />
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-28" />
+                          <Skeleton className="h-10 w-full max-w-lg" />
+                        </div>
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-10 w-full max-w-lg" />
+                        </div>
+                        <div className="space-y-2">
+                           <Skeleton className="h-4 w-36" />
+                          <Skeleton className="h-10 w-full max-w-lg" />
+                        </div>
+                        <Skeleton className="h-10 w-36 mt-4" />
                     </CardContent>
                 </Card>
             </div>
@@ -197,11 +227,11 @@ export default function AdminSettingsPage() {
                             <FormItem><FormLabel>New Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <FormField control={passwordForm.control} name="confirmPassword" render={({ field }) => (
-                            <FormItem><FormLabel>Confirm New Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></Form.Item>
+                            <FormItem><FormLabel>Confirm New Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <Button type="submit" disabled={passwordForm.formState.isSubmitting}>
                             {passwordForm.formState.isSubmitting ? 'Updating...' : 'Update Password'}
-                        </button>
+                        </Button>
                     </form>
                 </Form>
             </CardContent>
