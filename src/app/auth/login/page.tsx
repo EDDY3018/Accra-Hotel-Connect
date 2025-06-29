@@ -26,13 +26,13 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     if (email === 'admin@hostel.com' && password === 'adminpass') {
-      // This is a special, non-Firebase admin login for the prototype
       toast({ title: "Admin Login Successful", description: "Redirecting to admin dashboard..." });
       router.push('/admin/dashboard');
       setIsLoading(false);
@@ -43,16 +43,15 @@ export default function LoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Get user role from Firestore
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
         toast({ title: "Login Successful", description: "Redirecting to your dashboard..." });
-        // Redirect based on role, for now we only have student
+        
         if (userData.role === 'student' || userData.role === 'manager') {
             router.push('/student/dashboard');
         } else {
-            router.push('/'); // Fallback
+            router.push('/');
         }
       } else {
          toast({
@@ -73,11 +72,35 @@ export default function LoginPage() {
   }
 
   const handleGoogleLogin = async () => {
-     // Similar logic as in signup can be added here for a complete flow
-     toast({
-        title: "Coming Soon!",
-        description: "Google login is being implemented.",
+    setIsGoogleLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists() && userDoc.data().role === 'student') {
+        toast({ title: "Login Successful", description: "Redirecting to your dashboard..." });
+        router.push('/student/dashboard');
+      } else {
+        await auth.signOut();
+        toast({
+            variant: "destructive",
+            title: "No Student Profile Found",
+            description: "This Google account is not associated with a student profile. Please sign up first.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Google Login Failed",
+        description: error.message,
       });
+    } finally {
+      setIsGoogleLoading(false);
+    }
   }
 
 
@@ -103,7 +126,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoading}
+              disabled={isLoading || isGoogleLoading}
             />
           </div>
           <div className="grid gap-2">
@@ -123,14 +146,14 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
+              disabled={isLoading || isGoogleLoading}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button type="submit" className="w-full" disabled={isLoading || isGoogleLoading}>
             {isLoading ? "Logging in..." : "Login"}
           </Button>
-          <Button variant="outline" className="w-full" type="button" onClick={handleGoogleLogin} disabled={isLoading}>
-            Login with Google
+          <Button variant="outline" className="w-full" type="button" onClick={handleGoogleLogin} disabled={isLoading || isGoogleLoading}>
+            {isGoogleLoading ? 'Please wait...' : 'Login with Google'}
           </Button>
         </form>
         <div className="mt-4 text-center text-sm">

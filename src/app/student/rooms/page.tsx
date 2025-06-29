@@ -6,17 +6,52 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search } from "lucide-react"
+import { collection, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
-const rooms = [
-  { id: "1", name: "Standard Single Room", price: 5000, image: "https://placehold.co/600x400.png", hint: "cozy room", status: "Available", type: "Standard", amenities: ["Bed", "Desk", "Wardrobe", "Shared Bathroom"] },
-  { id: "2", name: "Deluxe Single Room", price: 7500, image: "https://placehold.co/600x400.png", hint: "modern apartment", status: "Available", type: "Deluxe", amenities: ["Bed", "Desk", "Wardrobe", "Private Bathroom", "A/C"] },
-  { id: "3", name: "Standard Double Room", price: 4500, image: "https://placehold.co/600x400.png", hint: "shared room", status: "1 Spot Left", type: "Standard", amenities: ["Bunk Bed", "Desk", "Wardrobe", "Shared Bathroom"] },
-  { id: "4", name: "Executive Suite", price: 10000, image: "https://placehold.co/600x400.png", hint: "luxury suite", status: "Occupied", type: "Suite", amenities: ["Queen Bed", "Desk", "Wardrobe", "Private Bathroom", "A/C", "Kitchenette"] },
-  { id: "5", name: "Standard Single Room", price: 5000, image: "https://placehold.co/600x400.png", hint: "student room", status: "Available", type: "Standard", amenities: ["Bed", "Desk", "Wardrobe", "Shared Bathroom"] },
-  { id: "6", name: "Deluxe Double Room", price: 6500, image: "https://placehold.co/600x400.png", hint: "spacious room", status: "Available", type: "Deluxe", amenities: ["Two Beds", "Desk", "Wardrobe", "Private Bathroom", "A/C"] },
-];
+interface Room {
+    id: string;
+    name: string;
+    price: number;
+    image: string;
+    hint: string;
+    status: 'Available' | 'Occupied' | '1 Spot Left';
+    type: 'Standard' | 'Deluxe' | 'Suite';
+    amenities: string[];
+}
 
-export default function RoomsPage() {
+async function getRooms(): Promise<Room[]> {
+    try {
+        const roomsCol = collection(db, 'rooms');
+        const roomSnapshot = await getDocs(roomsCol);
+        if (roomSnapshot.empty) {
+            console.log("No rooms found in Firestore. Returning empty array.");
+            return [];
+        }
+        const roomList = roomSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                name: data.name || "Unnamed Room",
+                price: data.price || 0,
+                image: data.image || "https://placehold.co/600x400.png",
+                hint: data.hint || "room",
+                status: data.status || "Available",
+                type: data.type || "Standard",
+                amenities: data.amenities || [],
+            } as Room;
+        });
+        return roomList;
+    } catch (error) {
+        console.error("Error fetching rooms:", error);
+        return []; // Return empty array on error
+    }
+}
+
+
+export default async function RoomsPage() {
+  const rooms = await getRooms();
+
   return (
     <>
         <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
@@ -42,35 +77,41 @@ export default function RoomsPage() {
                 </Select>
             </div>
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {rooms.map(room => (
-                <Card key={room.id} className="overflow-hidden flex flex-col">
-                    <CardHeader className="p-0 relative">
-                         <Badge className="absolute top-2 right-2" variant={room.status === 'Available' ? 'default' : room.status.includes('Spot') ? 'default': 'secondary'}>
-                            {room.status}
-                        </Badge>
-                        <Image
-                            src={room.image}
-                            alt={room.name}
-                            width={600}
-                            height={400}
-                            className="aspect-video object-cover"
-                            data-ai-hint={room.hint}
-                        />
-                    </CardHeader>
-                    <CardContent className="pt-6 flex-1">
-                        <CardTitle className="font-headline text-xl mb-2">{room.name}</CardTitle>
-                        <CardDescription>{room.amenities.slice(0, 4).join(', ')}...</CardDescription>
-                    </CardContent>
-                    <CardFooter className="flex justify-between items-center">
-                        <p className="font-semibold text-lg">GHS {room.price}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
-                        <Button asChild disabled={room.status === 'Occupied'}>
-                            <Link href={`/student/rooms/${room.id}`}>View Details</Link>
-                        </Button>
-                    </CardFooter>
-                </Card>
-            ))}
-        </div>
+         {rooms.length === 0 ? (
+            <div className="text-center py-12">
+                <p className="text-muted-foreground">No rooms available at the moment. Please check back later.</p>
+            </div>
+        ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {rooms.map(room => (
+                    <Card key={room.id} className="overflow-hidden flex flex-col">
+                        <CardHeader className="p-0 relative">
+                             <Badge className="absolute top-2 right-2" variant={room.status === 'Available' ? 'default' : room.status.includes('Spot') ? 'default': 'secondary'}>
+                                {room.status}
+                            </Badge>
+                            <Image
+                                src={room.image}
+                                alt={room.name}
+                                width={600}
+                                height={400}
+                                className="aspect-video object-cover"
+                                data-ai-hint={room.hint}
+                            />
+                        </CardHeader>
+                        <CardContent className="pt-6 flex-1">
+                            <CardTitle className="font-headline text-xl mb-2">{room.name}</CardTitle>
+                            <CardDescription>{room.amenities.slice(0, 4).join(', ')}...</CardDescription>
+                        </CardContent>
+                        <CardFooter className="flex justify-between items-center">
+                            <p className="font-semibold text-lg">GHS {room.price}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
+                            <Button asChild disabled={room.status === 'Occupied'}>
+                                <Link href={`/student/rooms/${room.id}`}>View Details</Link>
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                ))}
+            </div>
+        )}
     </>
   )
 }
