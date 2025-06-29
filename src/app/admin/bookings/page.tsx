@@ -18,13 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search } from "lucide-react"
 
-const bookings = [
-  { id: "B001", studentName: "Kwame Nkrumah", roomType: "Standard", checkIn: "2024-08-15", checkOut: "2025-05-15", status: "Paid" },
-  { id: "B002", studentName: "Ama Ata Aidoo", roomType: "Deluxe", checkIn: "2024-08-15", checkOut: "2025-05-15", status: "Paid" },
-  { id: "B003", studentName: "Kofi Annan", roomType: "Standard", checkIn: "2023-08-15", checkOut: "2024-05-15", status: "Completed" },
-  { id: "B004", studentName: "Yaa Asantewaa", roomType: "Standard", checkIn: "2024-08-15", checkOut: "2025-05-15", status: "Paid" },
-  { id: "B005", studentName: "Efua Sutherland", roomType: "Suite", checkIn: "2024-08-20", checkOut: "2025-05-15", status: "Pending" },
-];
+const bookings: any[] = [];
 
 export default function AdminBookingsPage() {
   return (
@@ -52,20 +46,26 @@ export default function AdminBookingsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {bookings.map((booking) => (
-              <TableRow key={booking.id}>
-                <TableCell className="font-medium">{booking.id}</TableCell>
-                <TableCell>{booking.studentName}</TableCell>
-                <TableCell>{booking.roomType}</TableCell>
-                <TableCell>{booking.checkIn}</TableCell>
-                <TableCell>{booking.checkOut}</TableCell>
-                <TableCell>
-                  <Badge variant={booking.status === "Paid" ? "default" : booking.status === "Completed" ? "secondary" : "destructive"}>
-                    {booking.status}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
+            {bookings.length === 0 ? (
+                <TableRow>
+                    <TableCell colSpan={6} className="text-center">No bookings found.</TableCell>
+                </TableRow>
+            ) : (
+                bookings.map((booking) => (
+                  <TableRow key={booking.id}>
+                    <TableCell className="font-medium">{booking.id}</TableCell>
+                    <TableCell>{booking.studentName}</TableCell>
+                    <TableCell>{booking.roomType}</TableCell>
+                    <TableCell>{booking.checkIn}</TableCell>
+                    <TableCell>{booking.checkOut}</TableCell>
+                    <TableCell>
+                      <Badge variant={booking.status === "Paid" ? "default" : booking.status === "Completed" ? "secondary" : "destructive"}>
+                        {booking.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+            )}
           </TableBody>
         </Table>
       </CardContent>

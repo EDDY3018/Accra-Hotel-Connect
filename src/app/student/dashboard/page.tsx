@@ -1,20 +1,64 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Bell, FileWarning, BedDouble } from "lucide-react";
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const announcements = [
-  { id: 1, title: "Quarterly Pest Control", date: "2024-05-15", content: "Pest control services will be conducted on all floors this Friday. Please ensure your food items are sealed." },
-  { id: 2, title: "End of Semester Checkout", date: "2024-05-10", content: "The deadline for moving out is May 30th. Please schedule your checkout inspection at the front desk." },
-];
+const announcements: any[] = [];
 
 export default function StudentDashboardPage() {
+  const [userName, setUserName] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        try {
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists()) {
+            const fullName = userDoc.data().fullName || '';
+            setUserName(fullName.split(' ')[0]);
+          }
+        } catch (error) {
+            console.error("Error fetching user data:", error);
+        } finally {
+            setIsLoading(false);
+        }
+      } else {
+        // Handle case where user is not logged in or auth state is not yet available
+        // For now, we'll just stop loading. A listener would be more robust.
+        setIsLoading(false);
+      }
+    };
+
+    // Use onAuthStateChanged for robustness
+    const unsubscribe = auth.onAuthStateChanged(user => {
+        if (user) {
+            fetchUserData();
+        } else {
+            setIsLoading(false);
+        }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="font-headline">Welcome back, Ama!</CardTitle>
+            {isLoading ? (
+              <Skeleton className="h-8 w-48" />
+            ) : (
+              <CardTitle className="font-headline">Welcome back, {userName || 'Student'}!</CardTitle>
+            )}
             <CardDescription>Here's a summary of your stay.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -43,16 +87,20 @@ export default function StudentDashboardPage() {
             <Bell className="w-5 h-5 text-primary" />
           </CardHeader>
           <CardContent>
-             <div className="space-y-4">
-              {announcements.map((item) => (
-                <div key={item.id} className="grid gap-1.5">
+            <div className="space-y-4">
+              {announcements.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No new announcements.</p>
+              ) : (
+                announcements.map((item) => (
+                  <div key={item.id} className="grid gap-1.5">
                     <div className="flex items-center justify-between">
-                        <p className="font-semibold">{item.title}</p>
-                        <span className="text-xs text-muted-foreground">{item.date}</span>
+                      <p className="font-semibold">{item.title}</p>
+                      <span className="text-xs text-muted-foreground">{item.date}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">{item.content}</p>
-                </div>
-              ))}
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>

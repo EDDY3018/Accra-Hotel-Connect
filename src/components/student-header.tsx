@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link"
-import { usePathname } from "next/navigation";
-import { CircleUser, Menu, Package2, Search, BedDouble, Wallet, LifeBuoy, LogOut, Home } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation";
+import { CircleUser, Menu, BedDouble, Wallet, LifeBuoy, LogOut, Home, Settings } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -13,10 +13,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { HostelIcon } from "./icons";
 import { cn } from "@/lib/utils";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { useToast } from "@/hooks/use-toast";
 
 const navItems = [
     { href: "/student/dashboard", icon: Home, label: "Dashboard" },
@@ -27,6 +29,18 @@ const navItems = [
 
 export function StudentHeader() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+        await signOut(auth);
+        toast({ title: "Logged Out", description: "You have been logged out successfully." });
+        router.push('/auth/login');
+    } catch (error) {
+        toast({ variant: "destructive", title: "Logout Failed", description: "An error occurred while logging out." });
+    }
+  }
 
   return (
     <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 z-50">
@@ -97,10 +111,14 @@ export function StudentHeader() {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
+            <Link href="/student/settings">
+              <DropdownMenuItem>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Profile & Settings</span>
+              </DropdownMenuItem>
+            </Link>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
             </DropdownMenuItem>

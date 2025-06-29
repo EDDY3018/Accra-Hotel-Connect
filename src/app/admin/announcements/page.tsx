@@ -29,11 +29,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 
-const announcements = [
-  { id: "AN001", title: "Quarterly Pest Control", author: "Admin", date: "2024-05-15", status: "Published" },
-  { id: "AN002", title: "End of Semester Checkout Procedures", author: "Admin", date: "2024-05-10", status: "Published" },
-  { id: "AN003", title: "Upcoming Water Maintenance", author: "Admin", date: "2024-05-25", status: "Draft" },
-];
+const announcements: any[] = [];
 
 export default function AdminAnnouncementsPage() {
   return (
@@ -87,28 +83,34 @@ export default function AdminAnnouncementsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {announcements.map((ann) => (
-              <TableRow key={ann.id}>
-                <TableCell className="font-medium">{ann.title}</TableCell>
-                <TableCell>{ann.author}</TableCell>
-                <TableCell>{ann.date}</TableCell>
-                <TableCell>
-                  <Badge variant={ann.status === "Published" ? "default" : "secondary"}>
-                    {ann.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                    <div className="flex gap-2">
-                        <Button variant="outline" size="icon">
-                            <Edit className="h-4 w-4" />
-                        </Button>
-                         <Button variant="destructive" size="icon">
-                            <Trash className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </TableCell>
-              </TableRow>
-            ))}
+            {announcements.length === 0 ? (
+                <TableRow>
+                    <TableCell colSpan={5} className="text-center">No announcements found.</TableCell>
+                </TableRow>
+            ) : (
+                announcements.map((ann) => (
+                  <TableRow key={ann.id}>
+                    <TableCell className="font-medium">{ann.title}</TableCell>
+                    <TableCell>{ann.author}</TableCell>
+                    <TableCell>{ann.date}</TableCell>
+                    <TableCell>
+                      <Badge variant={ann.status === "Published" ? "default" : "secondary"}>
+                        {ann.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                        <div className="flex gap-2">
+                            <Button variant="outline" size="icon">
+                                <Edit className="h-4 w-4" />
+                            </Button>
+                             <Button variant="destructive" size="icon">
+                                <Trash className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+            )}
           </TableBody>
         </Table>
       </CardContent>

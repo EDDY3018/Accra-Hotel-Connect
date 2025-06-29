@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { HostelIcon } from "@/components/icons"
 import { useToast } from "@/hooks/use-toast";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
@@ -26,7 +26,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -73,49 +72,6 @@ export default function LoginPage() {
     }
   }
 
-  const handleGoogleLogin = async () => {
-    setIsGoogleLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      const userDocRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        toast({ title: "Login Successful", description: "Redirecting to your dashboard..." });
-        
-        if (userData.role === 'student') {
-            router.push('/student/dashboard');
-        } else if (userData.role === 'manager') {
-            router.push('/student/dashboard'); // TODO: Redirect to manager dashboard
-        } else {
-            router.push('/');
-        }
-      } else {
-        // User exists in auth, but not in our database. They should sign up to create a profile.
-         await auth.signOut();
-         toast({
-            variant: "destructive",
-            title: "Profile Not Found",
-            description: "No user profile exists for this account. Please sign up first.",
-        });
-      }
-    } catch (error: any) {
-      console.error("Full Google Login Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Google Sign-In Error",
-        description: "Could not sign in. Please check your Firebase project configuration and try again.",
-      });
-    } finally {
-      setIsGoogleLoading(false);
-    }
-  }
-
-
   return (
     <Card className="mx-auto max-w-sm">
       <CardHeader>
@@ -138,7 +94,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoading || isGoogleLoading}
+              disabled={isLoading}
             />
           </div>
           <div className="grid gap-2">
@@ -158,14 +114,11 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading || isGoogleLoading}
+              disabled={isLoading}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={isLoading || isGoogleLoading}>
+          <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? "Logging in..." : "Login"}
-          </Button>
-          <Button variant="outline" className="w-full" type="button" onClick={handleGoogleLogin} disabled={isLoading || isGoogleLoading}>
-            {isGoogleLoading ? 'Please wait...' : 'Login with Google'}
           </Button>
         </form>
         <div className="mt-4 text-center text-sm">

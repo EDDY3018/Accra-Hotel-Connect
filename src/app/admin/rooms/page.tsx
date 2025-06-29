@@ -30,13 +30,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 
-const rooms = [
-  { id: "A101", type: "Standard", price: "GHS 5000", status: "Occupied" },
-  { id: "A102", type: "Standard", price: "GHS 5000", status: "Occupied" },
-  { id: "B203", type: "Deluxe", price: "GHS 7500", status: "Occupied" },
-  { id: "C305", type: "Standard", price: "GHS 5000", status: "Available" },
-  { id: "D401", type: "Suite", price: "GHS 10000", status: "Maintenance" },
-];
+const rooms: any[] = [];
 
 export default function AdminRoomsPage() {
   return (
@@ -106,28 +100,34 @@ export default function AdminRoomsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rooms.map((room) => (
-              <TableRow key={room.id}>
-                <TableCell className="font-medium">{room.id}</TableCell>
-                <TableCell>{room.type}</TableCell>
-                <TableCell>{room.price}</TableCell>
-                <TableCell>
-                  <Badge variant={room.status === "Occupied" ? "secondary" : room.status === "Available" ? "default" : "destructive"}>
-                    {room.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                    <div className="flex gap-2">
-                        <Button variant="outline" size="icon">
-                            <Edit className="h-4 w-4" />
-                        </Button>
-                         <Button variant="destructive" size="icon">
-                            <Trash className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </TableCell>
-              </TableRow>
-            ))}
+            {rooms.length === 0 ? (
+                <TableRow>
+                    <TableCell colSpan={5} className="text-center">No rooms found.</TableCell>
+                </TableRow>
+            ) : (
+                rooms.map((room) => (
+                  <TableRow key={room.id}>
+                    <TableCell className="font-medium">{room.id}</TableCell>
+                    <TableCell>{room.type}</TableCell>
+                    <TableCell>{room.price}</TableCell>
+                    <TableCell>
+                      <Badge variant={room.status === "Occupied" ? "secondary" : room.status === "Available" ? "default" : "destructive"}>
+                        {room.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                        <div className="flex gap-2">
+                            <Button variant="outline" size="icon">
+                                <Edit className="h-4 w-4" />
+                            </Button>
+                             <Button variant="destructive" size="icon">
+                                <Trash className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+            )}
           </TableBody>
         </Table>
       </CardContent>

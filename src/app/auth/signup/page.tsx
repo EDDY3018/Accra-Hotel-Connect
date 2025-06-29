@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -11,9 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/co
 import { Input } from "@/components/ui/input"
 import { HostelIcon } from "@/components/icons"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo, UserCredential, User } from "firebase/auth";
+import { createUserWithEmailAndPassword, User } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
@@ -27,25 +25,13 @@ const formSchema = z.object({
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
 });
 
-const completeProfileSchema = z.object({
-  phone: z.string().regex(/^\+?[0-9\s-]{10,15}$/, { message: "Please enter a valid phone number." }),
-  studentId: z.string().regex(studentIdRegex, { message: "Invalid Student ID format." }),
-});
-
 export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [googleUser, setGoogleUser] = useState<User | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: { fullName: "", phone: "", studentId: "", email: "", password: "" },
-  });
-
-  const completeProfileForm = useForm<z.infer<typeof completeProfileSchema>>({
-    resolver: zodResolver(completeProfileSchema),
-    defaultValues: { phone: "", studentId: "" },
   });
   
   const { isSubmitting } = form.formState;
@@ -73,59 +59,6 @@ export default function SignupPage() {
       router.push("/student/dashboard");
     } catch (error: any) {
       toast({ variant: "destructive", title: "Signup Failed", description: error.message });
-    }
-  }
-
-  async function handleGoogleSignUp() {
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const additionalInfo = getAdditionalUserInfo(result);
-      const user = result.user;
-
-      if (additionalInfo?.isNewUser) {
-        // This is a brand new user.
-        setGoogleUser(user);
-        setIsModalOpen(true);
-      } else {
-        // User already exists in Firebase Auth. Check if they have a profile in our Firestore DB.
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (userDoc.exists()) {
-            // User already has a full profile. They should use the login page.
-            toast({
-                title: "Account Already Exists",
-                description: "An account with this Google profile already exists. Please log in.",
-            });
-            // We sign them out of this auth session to avoid confusion
-            await auth.signOut();
-        } else {
-            // Edge case: User exists in Auth but not in our DB (e.g., failed first signup).
-            // Let them complete their profile.
-            setGoogleUser(user);
-            setIsModalOpen(true);
-        }
-      }
-    } catch (error: any) {
-      console.error("Full Google Sign-Up Error:", error);
-      toast({ 
-        variant: "destructive", 
-        title: "Google Sign-Up Error", 
-        description: "Could not sign up. Please check your Firebase project configuration and try again." 
-      });
-    }
-  }
-
-  async function onCompleteProfile(values: z.infer<typeof completeProfileSchema>) {
-    if (!googleUser) return;
-    try {
-      await createUserProfile(googleUser, { phone: values.phone, studentId: values.studentId });
-      setIsModalOpen(false);
-      toast({ title: "Profile Complete", description: "You have been successfully signed up." });
-      router.push("/student/dashboard");
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Profile Completion Failed", description: error.message });
     }
   }
 
@@ -160,41 +93,12 @@ export default function SignupPage() {
               <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting ? "Creating Account..." : "Create an account"}</Button>
             </form>
           </Form>
-          <Button variant="outline" className="w-full mt-4" onClick={handleGoogleSignUp} disabled={isSubmitting}>
-            Sign up with Google
-          </Button>
           <div className="mt-4 text-center text-sm">
             Already have an account?{" "}
             <Link href="/auth/login" className="underline">Login</Link>
           </div>
         </CardContent>
       </Card>
-
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Complete Your Profile</DialogTitle>
-            <DialogDescription>
-              Welcome, {googleUser?.displayName}! We just need a few more details to get you started.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...completeProfileForm}>
-            <form onSubmit={completeProfileForm.handleSubmit(onCompleteProfile)} className="space-y-4">
-              <FormField control={completeProfileForm.control} name="phone" render={({ field }) => (
-                <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+233 12 345 6789" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={completeProfileForm.control} name="studentId" render={({ field }) => (
-                <FormItem><FormLabel>Student ID</FormLabel><FormControl><Input placeholder="e.g., 01241234B" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <DialogFooter>
-                <Button type="submit" disabled={completeProfileForm.formState.isSubmitting}>
-                    {completeProfileForm.formState.isSubmitting ? "Saving..." : "Save and Continue"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

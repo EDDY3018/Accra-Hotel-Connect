@@ -18,14 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search } from "lucide-react"
 
-const students = [
-  { id: "S001", name: "Kwame Nkrumah", email: "kwame.n@university.edu", room: "A101", status: "Checked In" },
-  { id: "S002", name: "Ama Ata Aidoo", email: "ama.a@university.edu", room: "B203", status: "Checked In" },
-  { id: "S003", name: "Kofi Annan", email: "kofi.a@university.edu", room: "C305", status: "Checked Out" },
-  { id: "S004", name: "Yaa Asantewaa", email: "yaa.a@university.edu", room: "A102", status: "Checked In" },
-  { id: "S005", name: "Efua Sutherland", email: "efua.s@university.edu", room: "D401", status: "Pending" },
-  { id: "S006", name: "Osei Tutu", email: "osei.t@university.edu", room: "B204", status: "Checked In" },
-];
+const students: any[] = [];
 
 export default function AdminStudentsPage() {
   return (
@@ -53,19 +46,25 @@ export default function AdminStudentsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {students.map((student) => (
-              <TableRow key={student.id}>
-                <TableCell className="font-medium">{student.id}</TableCell>
-                <TableCell>{student.name}</TableCell>
-                <TableCell>{student.email}</TableCell>
-                <TableCell>{student.room}</TableCell>
-                <TableCell>
-                  <Badge variant={student.status === "Checked In" ? "default" : student.status === "Checked Out" ? "secondary" : "destructive"}>
-                    {student.status}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
+             {students.length === 0 ? (
+                <TableRow>
+                    <TableCell colSpan={5} className="text-center">No students found.</TableCell>
+                </TableRow>
+            ) : (
+                students.map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell className="font-medium">{student.id}</TableCell>
+                    <TableCell>{student.name}</TableCell>
+                    <TableCell>{student.email}</TableCell>
+                    <TableCell>{student.room}</TableCell>
+                    <TableCell>
+                      <Badge variant={student.status === "Checked In" ? "default" : student.status === "Checked Out" ? "secondary" : "destructive"}>
+                        {student.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+            )}
           </TableBody>
         </Table>
       </CardContent>

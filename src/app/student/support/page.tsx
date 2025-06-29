@@ -23,10 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
-const tickets = [
-  { id: "T002", subject: "Wi-Fi not working", status: "In Progress", date: "2024-05-19", description: "I haven't been able to connect to the hostel Wi-Fi since this morning.", response: "Our technical team is aware of the issue and is working to resolve it. We expect service to be restored within 2 hours." },
-  { id: "T003", subject: "Noise Complaint", status: "Closed", date: "2024-05-18", description: "My neighbors were playing loud music late into the night.", response: "We have spoken to the students in the concerned room and issued a warning. Please let us know if the issue persists." },
-];
+const tickets: any[] = [];
 
 export default function SupportPage() {
   return (
@@ -44,29 +41,35 @@ export default function SupportPage() {
                 <CardDescription>View the status of your support requests and complaints.</CardDescription>
             </CardHeader>
             <CardContent>
-                <Accordion type="single" collapsible className="w-full">
-                {tickets.map((ticket) => (
-                    <AccordionItem value={ticket.id} key={ticket.id}>
-                    <AccordionTrigger>
-                        <div className="flex justify-between w-full pr-4">
-                            <span>{ticket.subject}</span>
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm text-muted-foreground hidden md:inline">{ticket.date}</span>
-                                <Badge variant={ticket.status === "Open" ? "destructive" : ticket.status === "In Progress" ? "default" : "secondary"} className="bg-accent text-accent-foreground">
-                                    {ticket.status}
-                                </Badge>
+                {tickets.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                        <p>You have not submitted any tickets.</p>
+                    </div>
+                ) : (
+                    <Accordion type="single" collapsible className="w-full">
+                    {tickets.map((ticket) => (
+                        <AccordionItem value={ticket.id} key={ticket.id}>
+                        <AccordionTrigger>
+                            <div className="flex justify-between w-full pr-4">
+                                <span>{ticket.subject}</span>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-sm text-muted-foreground hidden md:inline">{ticket.date}</span>
+                                    <Badge variant={ticket.status === "Open" ? "destructive" : ticket.status === "In Progress" ? "default" : "secondary"} className="bg-accent text-accent-foreground">
+                                        {ticket.status}
+                                    </Badge>
+                                </div>
                             </div>
-                        </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                        <div className="p-4 bg-muted/50 rounded-lg space-y-4">
-                            <p><span className="font-semibold">My complaint:</span> {ticket.description}</p>
-                            <p className="border-t pt-4 mt-4"><span className="font-semibold">Admin response:</span> {ticket.response || "Awaiting response from admin."}</p>
-                        </div>
-                    </AccordionContent>
-                    </AccordionItem>
-                ))}
-                </Accordion>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+                                <p><span className="font-semibold">My complaint:</span> {ticket.description}</p>
+                                <p className="border-t pt-4 mt-4"><span className="font-semibold">Admin response:</span> {ticket.response || "Awaiting response from admin."}</p>
+                            </div>
+                        </AccordionContent>
+                        </AccordionItem>
+                    ))}
+                    </Accordion>
+                )}
             </CardContent>
         </Card>
       </TabsContent>
