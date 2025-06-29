@@ -34,6 +34,10 @@ export default function ManagerSignupPage() {
             <Input id="hostel-name" placeholder="e.g., Happy Students Hostel" required />
           </div>
           <div className="grid gap-2">
+            <Label htmlFor="location">Location</Label>
+            <Input id="location" placeholder="e.g., East Legon, Accra" required />
+          </div>
+          <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
