@@ -14,11 +14,14 @@ export default function Home() {
           <span className="sr-only">AccraHostelConnect</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6 items-center">
+          <Link href="/auth/manager-signup" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
+              Hostel Manager?
+          </Link>
           <Link href="/auth/login" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
-            Login
+            Student Login
           </Link>
           <Button asChild>
-            <Link href="/auth/signup" prefetch={false}>Sign Up</Link>
+            <Link href="/auth/signup" prefetch={false}>Student Sign Up</Link>
           </Button>
         </nav>
       </header>
