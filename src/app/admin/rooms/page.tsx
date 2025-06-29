@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -187,18 +188,25 @@ export default function AdminRoomsPage() {
       console.log("Image compression complete.");
 
       console.log("Starting image uploads...");
-      const uploadPromises = compressedImages.map((file, i) => {
-        const fileRef = storageRef(storage, `rooms/${user.uid}/${values.roomNumber}/${file.name}_${Date.now()}`);
-        return uploadBytes(fileRef, file).then(snapshot => 
-            getDownloadURL(snapshot.ref).then(url => ({
-                src: url,
-                hint: imageHints[i] || "room interior"
-            }))
-        );
+      const uploadPromises = compressedImages.map(async (file, i) => {
+          console.log(`[Image ${i + 1}] Starting upload for ${file.name}`);
+          const fileRef = storageRef(storage, `rooms/${user.uid}/${values.roomNumber}/${file.name}_${Date.now()}`);
+          
+          const snapshot = await uploadBytes(fileRef, file);
+          console.log(`[Image ${i + 1}] Upload complete. Getting download URL...`);
+          
+          const url = await getDownloadURL(snapshot.ref);
+          console.log(`[Image ${i + 1}] URL retrieved.`);
+          
+          return {
+              src: url,
+              hint: imageHints[i] || "room interior"
+          };
       });
 
       const imageUrls = await Promise.all(uploadPromises);
-      console.log("Image uploads completed. URLs:", imageUrls);
+      console.log("All image uploads completed. URLs:", imageUrls);
+
 
       const roomData = {
         managerUid: user.uid,
