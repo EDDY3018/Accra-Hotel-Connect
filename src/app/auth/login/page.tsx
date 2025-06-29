@@ -15,34 +15,71 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { HostelIcon } from "@/components/icons"
 import { useToast } from "@/hooks/use-toast";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+
 
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
 
-    // For prototype purposes, we'll use hardcoded credentials.
-    // Admin: admin@hostel.com / adminpass
-    // Student: student@hostel.com / studentpass
-    
     if (email === 'admin@hostel.com' && password === 'adminpass') {
-      toast({ title: "Login Successful", description: "Redirecting to admin dashboard..." });
+      // This is a special, non-Firebase admin login for the prototype
+      toast({ title: "Admin Login Successful", description: "Redirecting to admin dashboard..." });
       router.push('/admin/dashboard');
-    } else if (email === 'student@hostel.com' && password === 'studentpass') {
-       toast({ title: "Login Successful", description: "Redirecting to your dashboard..." });
-       router.push('/student/dashboard');
-    } else {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Get user role from Firestore
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        toast({ title: "Login Successful", description: "Redirecting to your dashboard..." });
+        // Redirect based on role, for now we only have student
+        if (userData.role === 'student' || userData.role === 'manager') {
+            router.push('/student/dashboard');
+        } else {
+            router.push('/'); // Fallback
+        }
+      } else {
+         toast({
+            variant: "destructive",
+            title: "Login Error",
+            description: "User profile not found.",
+        });
+      }
+    } catch (error: any) {
       toast({
           variant: "destructive",
           title: "Invalid Credentials",
           description: "Please check your email and password.",
       });
+    } finally {
+        setIsLoading(false);
     }
   }
+
+  const handleGoogleLogin = async () => {
+     // Similar logic as in signup can be added here for a complete flow
+     toast({
+        title: "Coming Soon!",
+        description: "Google login is being implemented.",
+      });
+  }
+
 
   return (
     <Card className="mx-auto max-w-sm">
@@ -62,10 +99,11 @@ export default function LoginPage() {
             <Input
               id="email"
               type="email"
-              placeholder="admin@hostel.com"
+              placeholder="student@hostel.com"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={isLoading}
             />
           </div>
           <div className="grid gap-2">
@@ -81,16 +119,17 @@ export default function LoginPage() {
             <Input 
               id="password" 
               type="password"
-              placeholder="adminpass"
+              placeholder="studentpass"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
             />
           </div>
-          <Button type="submit" className="w-full">
-            Login
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? "Logging in..." : "Login"}
           </Button>
-          <Button variant="outline" className="w-full" type="button">
+          <Button variant="outline" className="w-full" type="button" onClick={handleGoogleLogin} disabled={isLoading}>
             Login with Google
           </Button>
         </form>
