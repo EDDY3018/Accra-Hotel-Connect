@@ -312,7 +312,7 @@ export default function AdminRoomsPage() {
                                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                     <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
                                     <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                    <p className="text-xs text-muted-foreground">4 images required (3 room, 1 bath), PNG/JPG up to 1MB each</p>
+                                    <p className="text-xs text-muted-foreground">4 images required (3 room, 1 bath), PNG, JPG, or JPEG up to 1MB each</p>
                                     </div>
                                     <Input
                                     id="room-images-input"
