@@ -1,4 +1,5 @@
 import { StudentHeader } from "@/components/student-header";
+import { StudentChatbot } from "@/components/student-chatbot";
 
 export default function StudentLayout({
   children,
@@ -11,6 +12,7 @@ export default function StudentLayout({
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 bg-muted/20">
         {children}
       </main>
+      <StudentChatbot />
     </div>
   );
 }
