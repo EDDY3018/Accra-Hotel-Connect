@@ -138,18 +138,26 @@ export default function AdminSettingsPage() {
                         <Skeleton className="h-7 w-48" />
                         <Skeleton className="h-4 w-64" />
                     </CardHeader>
-                    <CardContent className="space-y-6">
+                    <CardContent className="space-y-4 max-w-lg">
                         <div className="space-y-2">
                           <Skeleton className="h-4 w-20" />
-                          <Skeleton className="h-10 w-full max-w-lg" />
+                          <Skeleton className="h-10 w-full" />
                         </div>
                         <div className="space-y-2">
                           <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-10 w-full max-w-lg" />
+                          <Skeleton className="h-10 w-full" />
                         </div>
                         <div className="space-y-2">
                           <Skeleton className="h-4 w-20" />
-                          <Skeleton className="h-10 w-full max-w-lg" />
+                          <Skeleton className="h-10 w-full" />
+                        </div>
+                         <div className="space-y-2">
+                          <Skeleton className="h-4 w-28" />
+                          <Skeleton className="h-10 w-full" />
+                        </div>
+                         <div className="space-y-2">
+                          <Skeleton className="h-4 w-16" />
+                          <Skeleton className="h-10 w-full" />
                         </div>
                         <Skeleton className="h-10 w-28 mt-4" />
                     </CardContent>
@@ -159,24 +167,24 @@ export default function AdminSettingsPage() {
                         <Skeleton className="h-7 w-48" />
                         <Skeleton className="h-4 w-64" />
                     </CardHeader>
-                    <CardContent className="space-y-6">
+                    <CardContent className="space-y-4 max-w-lg">
                         <div className="space-y-2">
                           <Skeleton className="h-4 w-28" />
-                          <Skeleton className="h-10 w-full max-w-lg" />
+                          <Skeleton className="h-10 w-full" />
                         </div>
                         <div className="space-y-2">
                           <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-10 w-full max-w-lg" />
+                          <Skeleton className="h-10 w-full" />
                         </div>
                         <div className="space-y-2">
                            <Skeleton className="h-4 w-36" />
-                          <Skeleton className="h-10 w-full max-w-lg" />
+                          <Skeleton className="h-10 w-full" />
                         </div>
                         <Skeleton className="h-10 w-36 mt-4" />
                     </CardContent>
                 </Card>
             </div>
-        )
+        );
     }
 
   return (
@@ -190,19 +198,49 @@ export default function AdminSettingsPage() {
                 <Form {...profileForm}>
                     <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4 max-w-lg">
                         <FormField control={profileForm.control} name="fullName" render={({ field }) => (
-                            <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem>
+                                <FormLabel>Full Name</FormLabel>
+                                <FormControl>
+                                    <Input {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
                         )} />
                         <FormField control={profileForm.control} name="hostelName" render={({ field }) => (
-                            <FormItem><FormLabel>Hostel Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem>
+                                <FormLabel>Hostel Name</FormLabel>
+                                <FormControl>
+                                    <Input {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
                         )} />
                          <FormField control={profileForm.control} name="location" render={({ field }) => (
-                            <FormItem><FormLabel>Location</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
+                            <FormItem>
+                                <FormLabel>Location</FormLabel>
+                                <FormControl>
+                                    <Input {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                         )} />
                         <FormField control={profileForm.control} name="phone" render={({ field }) => (
-                            <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem>
+                                <FormLabel>Phone Number</FormLabel>
+                                <FormControl>
+                                    <Input type="tel" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
                         )} />
                         <FormField control={profileForm.control} name="email" render={({ field }) => (
-                            <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} disabled /></FormControl><FormMessage /></FormItem>
+                            <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                    <Input type="email" {...field} disabled />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
                         )} />
                         <Button type="submit" disabled={profileForm.formState.isSubmitting}>
                             {profileForm.formState.isSubmitting ? 'Saving...' : 'Save Changes'}
@@ -221,13 +259,31 @@ export default function AdminSettingsPage() {
                  <Form {...passwordForm}>
                     <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4 max-w-lg">
                         <FormField control={passwordForm.control} name="currentPassword" render={({ field }) => (
-                            <FormItem><FormLabel>Current Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem>
+                                <FormLabel>Current Password</FormLabel>
+                                <FormControl>
+                                    <Input type="password" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
                         )} />
                         <FormField control={passwordForm.control} name="newPassword" render={({ field }) => (
-                            <FormItem><FormLabel>New Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem>
+                                <FormLabel>New Password</FormLabel>
+                                <FormControl>
+                                    <Input type="password" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
                         )} />
                         <FormField control={passwordForm.control} name="confirmPassword" render={({ field }) => (
-                            <FormItem><FormLabel>Confirm New Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem>
+                                <FormLabel>Confirm New Password</FormLabel>
+                                <FormControl>
+                                    <Input type="password" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
                         )} />
                         <Button type="submit" disabled={passwordForm.formState.isSubmitting}>
                             {passwordForm.formState.isSubmitting ? 'Updating...' : 'Update Password'}
@@ -237,5 +293,5 @@ export default function AdminSettingsPage() {
             </CardContent>
         </Card>
     </div>
-  )
+  );
 }
