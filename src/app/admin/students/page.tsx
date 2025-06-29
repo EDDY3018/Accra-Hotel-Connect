@@ -45,12 +45,7 @@ interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: UserOptions) => jsPDFWithAutoTable;
 }
 
-// NOTE: This is mock data. In a real application, you would fetch this from your database.
-const students = [
-    { id: '01241234B', name: 'Ama Ata Aidoo', email: 'ama.aidoo@school.com', room: 'E401', paymentStatus: 'Paid', totalFee: 5000, balance: 0 },
-    { id: '01235678D', name: 'Kwame Nkrumah', email: 'kwame.n@school.com', room: 'A102', paymentStatus: 'Partial', totalFee: 6000, balance: 3000 },
-    { id: '01229012H', name: 'Yaa Asantewaa', email: 'yaa.a@school.com', room: 'C305', paymentStatus: 'Unpaid', totalFee: 5500, balance: 5500 },
-];
+const students: any[] = [];
 
 
 export default function AdminStudentsPage() {
@@ -82,7 +77,7 @@ export default function AdminStudentsPage() {
     const doc = new jsPDF() as jsPDFWithAutoTable;
     doc.autoTable({
       head: [['Student ID', 'Name', 'Email', 'Room No.', 'Payment Status', 'Outstanding (GHS)']],
-      body: students.map(student => [
+      body: students.map((student: any) => [
         student.id,
         student.name,
         student.email,
@@ -189,7 +184,7 @@ export default function AdminStudentsPage() {
                     <TableCell colSpan={6} className="text-center">No students found.</TableCell>
                 </TableRow>
             ) : (
-                students.map((student) => (
+                students.map((student: any) => (
                   <TableRow key={student.id}>
                     <TableCell className="font-medium">{student.id}</TableCell>
                     <TableCell>{student.name}</TableCell>
