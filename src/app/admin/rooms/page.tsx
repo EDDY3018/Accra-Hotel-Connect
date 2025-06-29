@@ -280,7 +280,7 @@ export default function AdminRoomsPage() {
                 </CardHeader>
                 <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6 py-4">
+                    <form id="add-room-form" onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6 py-4">
                     <FormField
                         control={form.control}
                         name="images"
@@ -378,7 +378,7 @@ export default function AdminRoomsPage() {
                 <CardFooter>
                     <div className="flex justify-end gap-2 w-full">
                         <Button variant="outline" onClick={() => setIsFormVisible(false)}>Cancel</Button>
-                        <Button type="submit" form="add-room-form" onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Room'}</Button>
+                        <Button type="submit" form="add-room-form" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Room'}</Button>
                     </div>
                 </CardFooter>
             </Card>
