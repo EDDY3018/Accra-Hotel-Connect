@@ -1,9 +1,9 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { HostelIcon } from "@/components/icons"
 import { BedDouble, FileText, Megaphone, ShieldCheck } from "lucide-react"
 import Image from "next/image"
+import { LegalModal } from "@/components/legal-modal"
 
 export default function Home() {
   return (
@@ -13,7 +13,7 @@ export default function Home() {
           <HostelIcon className="h-8 w-8 text-primary" />
           <span className="sr-only">AccraHostelConnect</span>
         </Link>
-        <nav className="ml-auto flex gap-4 sm:gap-6">
+        <nav className="ml-auto flex gap-4 sm:gap-6 items-center">
           <Link href="/auth/login" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
             Login
           </Link>
@@ -33,7 +33,7 @@ export default function Home() {
                 <p className="mx-auto max-w-[700px] text-foreground/80 md:text-xl">
                   AccraHostelConnect streamlines your student living experience. Easily browse, book, and manage your stay.
                 </p>
-                <div className="space-x-4">
+                <div className="flex flex-col sm:flex-row gap-4 pt-2">
                   <Button asChild size="lg">
                     <Link href="/auth/signup" prefetch={false}>Get Started</Link>
                   </Button>
@@ -42,9 +42,9 @@ export default function Home() {
                   </Button>
                 </div>
               </div>
-              <div className="relative">
+              <div className="relative flex items-center justify-center">
                  <Image
-                    src="https://placehold.co/600x400.png"
+                    src="https://images.unsplash.com/photo-1543653473-3151b15489a8?q=80&w=600&h=400&auto=format&fit=crop"
                     alt="Hero Hostel"
                     width={600}
                     height={400}
@@ -106,12 +106,8 @@ export default function Home() {
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
         <p className="text-xs text-muted-foreground">&copy; 2024 AccraHostelConnect. All rights reserved.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
-          <Link href="#" className="text-xs hover:underline underline-offset-4" prefetch={false}>
-            Terms of Service
-          </Link>
-          <Link href="#" className="text-xs hover:underline underline-offset-4" prefetch={false}>
-            Privacy
-          </Link>
+          <LegalModal topic="Terms of Service" appName="AccraHostelConnect" />
+          <LegalModal topic="Privacy Policy" appName="AccraHostelConnect" />
         </nav>
       </footer>
     </div>
