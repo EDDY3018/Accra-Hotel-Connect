@@ -133,17 +133,13 @@ export default function AdminRoomsPage() {
       const currentFiles = form.getValues('images') || [];
       const combinedFiles = [...currentFiles, ...Array.from(newFiles)];
       
-      const limitedFiles = combinedFiles.slice(0, 4); // Limit to a max of 4 images
+      const limitedFiles = combinedFiles.slice(0, 4);
 
       form.setValue('images', limitedFiles, { shouldValidate: true });
       
-      // Create new object URLs for the updated list of files.
-      // The existing useEffect hook will handle revoking old URLs.
       const newPreviews = limitedFiles.map(file => URL.createObjectURL(file));
       setImagePreviews(newPreviews);
       
-      // Clear the file input value. This is important to allow re-selecting the same file
-      // if the user removes it and then wants to add it back.
       if (event.target) {
         event.target.value = "";
       }
@@ -168,7 +164,6 @@ export default function AdminRoomsPage() {
   };
   
   useEffect(() => {
-    // When the component unmounts or imagePreviews change, revoke the object URLs to avoid memory leaks.
     return () => {
       imagePreviews.forEach(url => URL.revokeObjectURL(url));
     };
@@ -183,16 +178,19 @@ export default function AdminRoomsPage() {
 
     try {
       const storage = getStorage();
-      const imageUrls: { src: string; hint: string }[] = [];
       const imageHints = ["room angle one", "room angle two", "room angle three", "bathroom"];
       
-      for (let i = 0; i < values.images.length; i++) {
-        const file = values.images[i];
+      const uploadPromises = values.images.map((file, i) => {
         const fileRef = storageRef(storage, `rooms/${user.uid}/${values.roomNumber}/${file.name}_${Date.now()}`);
-        await uploadBytes(fileRef, file);
-        const url = await getDownloadURL(fileRef);
-        imageUrls.push({ src: url, hint: imageHints[i] || "room interior" });
-      }
+        return uploadBytes(fileRef, file).then(snapshot => 
+            getDownloadURL(snapshot.ref).then(url => ({
+                src: url,
+                hint: imageHints[i] || "room interior"
+            }))
+        );
+      });
+
+      const imageUrls = await Promise.all(uploadPromises);
 
       const roomData = {
         managerUid: user.uid,
