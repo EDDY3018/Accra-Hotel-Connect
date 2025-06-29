@@ -240,7 +240,7 @@ export default function AdminRoomsPage() {
                       <FormItem>
                         <FormLabel>Room Images (must be 4)</FormLabel>
                         <FormControl>
-                          <>
+                          <div>
                             {imagePreviews.length > 0 && (
                               <div className="grid grid-cols-4 gap-2 mb-4">
                                 {imagePreviews.map((src, index) => (
@@ -277,7 +277,7 @@ export default function AdminRoomsPage() {
                                 />
                               </label>
                             </div>
-                          </>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
