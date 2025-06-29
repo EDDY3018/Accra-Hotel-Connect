@@ -4,24 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts"
 import { Users, BedDouble, BookCheck, LifeBuoy } from "lucide-react"
 
-const occupancyData = [
-  { name: 'Standard', occupied: 45, total: 60 },
-  { name: 'Deluxe', occupied: 25, total: 30 },
-  { name: 'Suite', occupied: 8, total: 10 },
-];
-
-const ticketsData = [
-    { month: 'Jan', open: 12, closed: 20 },
-    { month: 'Feb', open: 15, closed: 25 },
-    { month: 'Mar', open: 8, closed: 18 },
-    { month: 'Apr', open: 10, closed: 22 },
-    { month: 'May', open: 5, closed: 15 },
-]
+const occupancyData: any[] = [];
+const ticketsData: any[] = [];
 
 export default function AdminDashboard() {
   return (
     <>
-        <h1 className="text-3xl font-bold font-headline mb-6">Dashboard</h1>
+        <h1 className="text-3xl font-bold font-headline mb-6">Hostel Manager Dashboard</h1>
         <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -31,9 +20,9 @@ export default function AdminDashboard() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">1,254</div>
+              <div className="text-2xl font-bold">0</div>
               <p className="text-xs text-muted-foreground">
-                +20.1% from last month
+                No student data available
               </p>
             </CardContent>
           </Card>
@@ -45,9 +34,9 @@ export default function AdminDashboard() {
               <BedDouble className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">82%</div>
+              <div className="text-2xl font-bold">0%</div>
               <p className="text-xs text-muted-foreground">
-                78 out of 100 rooms filled
+                No room data available
               </p>
             </CardContent>
           </Card>
@@ -57,9 +46,9 @@ export default function AdminDashboard() {
               <BookCheck className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">+52</div>
+              <div className="text-2xl font-bold">0</div>
               <p className="text-xs text-muted-foreground">
-                This week
+                No new bookings this week
               </p>
             </CardContent>
           </Card>
@@ -69,9 +58,9 @@ export default function AdminDashboard() {
               <LifeBuoy className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">5</div>
+              <div className="text-2xl font-bold">0</div>
               <p className="text-xs text-muted-foreground">
-                2 resolved today
+                No open tickets
               </p>
             </CardContent>
           </Card>
@@ -83,6 +72,7 @@ export default function AdminDashboard() {
                     <CardDescription>Current occupancy status by room category.</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {occupancyData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={300}>
                         <BarChart data={occupancyData}>
                             <CartesianGrid strokeDasharray="3 3" />
@@ -99,6 +89,11 @@ export default function AdminDashboard() {
                             <Bar dataKey="total" fill="hsl(var(--muted))" name="Total" />
                         </BarChart>
                     </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                      <p>No occupancy data to display.</p>
+                    </div>
+                  )}
                 </CardContent>
             </Card>
             <Card className="xl:col-span-1">
@@ -107,7 +102,8 @@ export default function AdminDashboard() {
                     <CardDescription>Open vs. closed tickets over the past months.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
+                    {ticketsData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={300}>
                          <BarChart data={ticketsData}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="month" />
@@ -122,7 +118,12 @@ export default function AdminDashboard() {
                             <Bar dataKey="open" stackId="a" fill="hsl(var(--destructive))" name="Open"/>
                             <Bar dataKey="closed" stackId="a" fill="hsl(var(--primary))" name="Closed"/>
                         </BarChart>
-                    </ResponsiveContainer>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                        <p>No ticket data to display.</p>
+                      </div>
+                    )}
                 </CardContent>
             </Card>
         </div>
