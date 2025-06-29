@@ -108,7 +108,12 @@ export default function SignupPage() {
         }
       }
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Google Sign-Up Failed", description: "Please check your Firebase project configuration or try again." });
+      console.error("Google Sign-Up Error:", error.code, error.message);
+      toast({ 
+        variant: "destructive", 
+        title: "Google Sign-Up Error", 
+        description: "Could not sign up. Please check your Firebase project configuration and try again." 
+      });
     }
   }
 

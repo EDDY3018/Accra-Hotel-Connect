@@ -104,10 +104,11 @@ export default function LoginPage() {
         });
       }
     } catch (error: any) {
+      console.error("Google Login Error:", error.code, error.message);
       toast({
         variant: "destructive",
-        title: "Google Login Failed",
-        description: "Please check your Firebase project configuration or try again.",
+        title: "Google Sign-In Error",
+        description: "Could not sign in. Please check your Firebase project configuration and try again.",
       });
     } finally {
       setIsGoogleLoading(false);
