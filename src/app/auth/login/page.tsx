@@ -48,8 +48,10 @@ export default function LoginPage() {
         const userData = userDoc.data();
         toast({ title: "Login Successful", description: "Redirecting to your dashboard..." });
         
-        if (userData.role === 'student' || userData.role === 'manager') {
+        if (userData.role === 'student') {
             router.push('/student/dashboard');
+        } else if (userData.role === 'manager') {
+            router.push('/student/dashboard'); // TODO: Redirect to manager dashboard
         } else {
             router.push('/');
         }
@@ -81,22 +83,31 @@ export default function LoginPage() {
       const userDocRef = doc(db, "users", user.uid);
       const userDoc = await getDoc(userDocRef);
 
-      if (userDoc.exists() && userDoc.data().role === 'student') {
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
         toast({ title: "Login Successful", description: "Redirecting to your dashboard..." });
-        router.push('/student/dashboard');
+        
+        if (userData.role === 'student') {
+            router.push('/student/dashboard');
+        } else if (userData.role === 'manager') {
+            router.push('/student/dashboard'); // TODO: Redirect to manager dashboard
+        } else {
+            router.push('/');
+        }
       } else {
-        await auth.signOut();
-        toast({
+        // User exists in auth, but not in our database. They should sign up to create a profile.
+         await auth.signOut();
+         toast({
             variant: "destructive",
-            title: "No Student Profile Found",
-            description: "This Google account is not associated with a student profile. Please sign up first.",
+            title: "Profile Not Found",
+            description: "No user profile exists for this account. Please sign up first.",
         });
       }
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Google Login Failed",
-        description: error.message,
+        description: "Please check your Firebase project configuration or try again.",
       });
     } finally {
       setIsGoogleLoading(false);

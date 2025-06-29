@@ -81,16 +81,34 @@ export default function SignupPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const additionalInfo = getAdditionalUserInfo(result);
+      const user = result.user;
 
       if (additionalInfo?.isNewUser) {
-        setGoogleUser(result.user);
+        // This is a brand new user.
+        setGoogleUser(user);
         setIsModalOpen(true);
       } else {
-        toast({ title: "Welcome Back!", description: "You have been successfully logged in." });
-        router.push("/student/dashboard");
+        // User already exists in Firebase Auth. Check if they have a profile in our Firestore DB.
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+            // User already has a full profile. They should use the login page.
+            toast({
+                title: "Account Already Exists",
+                description: "An account with this Google profile already exists. Please log in.",
+            });
+            // We sign them out of this auth session to avoid confusion
+            await auth.signOut();
+        } else {
+            // Edge case: User exists in Auth but not in our DB (e.g., failed first signup).
+            // Let them complete their profile.
+            setGoogleUser(user);
+            setIsModalOpen(true);
+        }
       }
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Google Sign-Up Failed", description: error.message });
+      toast({ variant: "destructive", title: "Google Sign-Up Failed", description: "Please check your Firebase project configuration or try again." });
     }
   }
 
