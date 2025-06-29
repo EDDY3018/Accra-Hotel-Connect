@@ -63,8 +63,8 @@ export default function ManagerSignupPage() {
         role: 'manager',
       });
       
-      toast({ title: "Account Created", description: "Your manager account has been created successfully." });
-      router.push("/student/dashboard"); // Should eventually go to a manager dashboard
+      toast({ title: "Account Created", description: "Your manager account has been created. Redirecting to the dashboard." });
+      router.push("/admin/dashboard");
     } catch (error: any) {
       toast({
         variant: "destructive",

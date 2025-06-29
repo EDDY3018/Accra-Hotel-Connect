@@ -45,13 +45,15 @@ export default function LoginPage() {
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        toast({ title: "Login Successful", description: "Redirecting to your dashboard..." });
         
         if (userData.role === 'student') {
+            toast({ title: "Login Successful", description: "Redirecting to your dashboard..." });
             router.push('/student/dashboard');
         } else if (userData.role === 'manager') {
-            router.push('/student/dashboard'); // TODO: Redirect to manager dashboard
+            toast({ title: "Manager Login Successful", description: "Redirecting to the admin dashboard..." });
+            router.push('/admin/dashboard');
         } else {
+            // Default redirect if role is not defined
             router.push('/');
         }
       } else {
@@ -62,6 +64,7 @@ export default function LoginPage() {
         });
       }
     } catch (error: any) {
+      console.error("Login Error:", error);
       toast({
           variant: "destructive",
           title: "Invalid Credentials",
