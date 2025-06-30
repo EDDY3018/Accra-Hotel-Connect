@@ -47,7 +47,7 @@ export default function Home() {
               </div>
               <div className="relative flex items-center justify-center">
                  <Image
-                    src="/images/hostel.png"
+                    src="/images/hostel.jpg"
                     alt="Hero Hostel"
                     width={600}
                     height={400}
