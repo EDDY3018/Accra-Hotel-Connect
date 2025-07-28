@@ -78,7 +78,6 @@ type RoomDetails = {
 };
 
 export default function RoomDetailPage({ params }: { params: { id: string } }) {
-  const { id } = params;
   const router = useRouter();
   const { toast } = useToast();
   const [roomDetails, setRoomDetails] = useState<RoomDetails | null>(null);
@@ -125,11 +124,14 @@ export default function RoomDetailPage({ params }: { params: { id: string } }) {
         }
       }
     });
+    
+    if (params.id) {
+      getRoomDetails(params.id).finally(() => setIsLoading(false));
+    }
 
-    getRoomDetails(id).finally(() => setIsLoading(false));
 
     return () => unsubscribe();
-  }, [id, form, toast]);
+  }, [params.id, form, toast]);
 
   const { isSubmitting } = form.formState;
 
