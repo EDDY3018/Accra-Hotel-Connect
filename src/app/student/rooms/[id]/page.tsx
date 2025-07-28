@@ -92,14 +92,17 @@ export default function RoomDetailPage({ params }: { params: { id: string } }) {
   });
 
   useEffect(() => {
-    async function getRoomDetails(roomId: string) {
+    async function getRoomDetails() {
+      if (!params.id) return;
       setIsLoading(true);
       try {
-        const roomRef = doc(db, 'rooms', roomId);
+        const roomRef = doc(db, 'rooms', params.id);
         const roomSnap = await getDoc(roomRef);
 
         if (roomSnap.exists()) {
           setRoomDetails({ id: roomSnap.id, ...roomSnap.data() } as RoomDetails);
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: 'Room not found.' });
         }
       } catch (error) {
         console.error('Error fetching room details:', error);
@@ -123,12 +126,9 @@ export default function RoomDetailPage({ params }: { params: { id: string } }) {
           });
         }
       }
+      // Only fetch room details after we have auth state
+      getRoomDetails().finally(() => setIsLoading(false));
     });
-    
-    if (params.id) {
-      getRoomDetails(params.id).finally(() => setIsLoading(false));
-    }
-
 
     return () => unsubscribe();
   }, [params.id, form, toast]);
@@ -142,7 +142,7 @@ export default function RoomDetailPage({ params }: { params: { id: string } }) {
       return;
     }
     if (!roomDetails) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Room details not found.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Room details not available.' });
         return;
     }
     if (roomDetails.status !== 'Available') {
