@@ -242,10 +242,10 @@ export default function AdminRoomsPage() {
             description = 'Permission denied. You are not authorized to upload images. Check your Storage security rules.';
             break;
           case 'storage/retry-limit-exceeded':
-            description = 'Network timeout. Please check your internet connection and Storage rules.';
+            description = 'Network timeout. Please check your internet connection and verify your Storage rules and bucket configuration in .env.';
             break;
           case 'firestore/permission-denied':
-             description = 'Permission denied. You cannot save data to the database. Check your Firestore security rules.';
+             description = 'Permission denied. Your Firestore security rules do not allow you to save this data. Ensure the managerUid in your data matches your authenticated user ID.';
             break;
           default:
             description = `An unexpected error occurred: ${error.message}`;
