@@ -78,6 +78,7 @@ type RoomDetails = {
 };
 
 export default function RoomDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
   const { toast } = useToast();
   const [roomDetails, setRoomDetails] = useState<RoomDetails | null>(null);
@@ -93,10 +94,10 @@ export default function RoomDetailPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     async function getRoomDetails() {
-      if (!params.id) return;
+      if (!id) return;
       setIsLoading(true);
       try {
-        const roomRef = doc(db, 'rooms', params.id);
+        const roomRef = doc(db, 'rooms', id);
         const roomSnap = await getDoc(roomRef);
 
         if (roomSnap.exists()) {
@@ -131,7 +132,7 @@ export default function RoomDetailPage({ params }: { params: { id: string } }) {
     });
 
     return () => unsubscribe();
-  }, [params.id, form, toast]);
+  }, [id, form, toast]);
 
   const { isSubmitting } = form.formState;
 
