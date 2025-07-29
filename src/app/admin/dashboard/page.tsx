@@ -1,13 +1,161 @@
+
 "use client"
 
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts"
 import { Users, BedDouble, BookCheck, LifeBuoy } from "lucide-react"
+import { auth, db } from '@/lib/firebase';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const occupancyData: any[] = [];
-const ticketsData: any[] = [];
+interface OccupancyData {
+  name: string;
+  total: number;
+  occupied: number;
+}
+
+interface TicketsData {
+    month: string;
+    open: number;
+    closed: number;
+}
 
 export default function AdminDashboard() {
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    occupancyRate: 0,
+    newBookings: 0,
+    openTickets: 0,
+  });
+  const [occupancyData, setOccupancyData] = useState<OccupancyData[]>([]);
+  const [ticketsData, setTicketsData] = useState<TicketsData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
+      const user = auth.currentUser;
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+      const managerUid = user.uid;
+
+      try {
+        // --- Fetch all data in parallel ---
+        const [roomsSnapshot, ticketsSnapshot, bookingsSnapshot, studentsSnapshot] = await Promise.all([
+          getDocs(query(collection(db, "rooms"), where("managerUid", "==", managerUid))),
+          getDocs(query(collection(db, "tickets"), where("managerUid", "==", managerUid))),
+          getDocs(query(collection(db, "bookings"), where("managerUid", "==", managerUid))),
+          getDocs(query(collection(db, "users"), where("role", "==", "student"), where("managerUid", "==", managerUid))),
+        ]);
+
+        // --- Process Rooms & Occupancy ---
+        const totalRooms = roomsSnapshot.size;
+        const occupiedRooms = roomsSnapshot.docs.filter(doc => doc.data().status === 'Occupied').length;
+        const occupancyRate = totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
+
+        const roomTypeCounts = roomsSnapshot.docs.reduce((acc, doc) => {
+            const room = doc.data();
+            const type = room.name || 'Unknown';
+            if (!acc[type]) {
+                acc[type] = { name: type, total: 0, occupied: 0 };
+            }
+            acc[type].total += 1;
+            if (room.status === 'Occupied') {
+                acc[type].occupied += 1;
+            }
+            return acc;
+        }, {} as { [key: string]: OccupancyData });
+        setOccupancyData(Object.values(roomTypeCounts));
+
+        // --- Process Bookings ---
+        const oneWeekAgo = Timestamp.now().toMillis() - 7 * 24 * 60 * 60 * 1000;
+        const newBookings = bookingsSnapshot.docs.filter(doc => {
+            const bookingDate = new Date(doc.data().bookingDate).getTime();
+            return bookingDate >= oneWeekAgo;
+        }).length;
+        
+        // --- Process Tickets ---
+        const openTickets = ticketsSnapshot.docs.filter(doc => doc.data().status === 'Open').length;
+
+        const monthlyTickets = ticketsSnapshot.docs.reduce((acc, doc) => {
+            const ticket = doc.data();
+            const month = ticket.createdAt.toDate().toLocaleString('default', { month: 'short' });
+            if (!acc[month]) {
+                acc[month] = { month, open: 0, closed: 0 };
+            }
+            if (ticket.status === 'Resolved') {
+                acc[month].closed += 1;
+            } else {
+                acc[month].open += 1;
+            }
+            return acc;
+        }, {} as { [key: string]: TicketsData });
+        setTicketsData(Object.values(monthlyTickets));
+
+        // --- Process Students ---
+        // This is a simplified student count. A more robust way would be to query bookings
+        // but for now we'll assume a user with a managerUid is a student of that manager.
+        // We need to add 'managerUid' to user profiles for this to work.
+        const studentsQuery = query(collection(db, 'users'), where('role', '==', 'student'));
+        const allStudentsSnap = await getDocs(studentsQuery);
+        // This is a placeholder since we don't have managerUid on students yet.
+        const totalStudents = allStudentsSnap.size;
+
+
+        setStats({
+          totalStudents: totalStudents,
+          occupancyRate: Math.round(occupancyRate),
+          newBookings,
+          openTickets,
+        });
+
+      } catch (error) {
+        console.error("Error fetching dashboard data: ", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      if (user) {
+        fetchDashboardData();
+      } else {
+        setIsLoading(false); // No user, so stop loading
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (isLoading) {
+    return (
+       <>
+        <h1 className="text-3xl font-bold font-headline mb-6"><Skeleton className="h-9 w-96" /></h1>
+        <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-4 w-4" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-12 mb-2" />
+                <Skeleton className="h-4 w-3/4" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-2 mt-8">
+            <Card className="xl:col-span-1"><CardContent><Skeleton className="h-[350px] w-full" /></CardContent></Card>
+            <Card className="xl:col-span-1"><CardContent><Skeleton className="h-[350px] w-full" /></CardContent></Card>
+        </div>
+       </>
+    )
+  }
+
   return (
     <>
         <h1 className="text-3xl font-bold font-headline mb-6">Hostel Manager Dashboard</h1>
@@ -20,9 +168,9 @@ export default function AdminDashboard() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">{stats.totalStudents}</div>
               <p className="text-xs text-muted-foreground">
-                No student data available
+                Currently active students
               </p>
             </CardContent>
           </Card>
@@ -34,9 +182,9 @@ export default function AdminDashboard() {
               <BedDouble className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0%</div>
+              <div className="text-2xl font-bold">{stats.occupancyRate}%</div>
               <p className="text-xs text-muted-foreground">
-                No room data available
+                Percentage of rooms currently occupied
               </p>
             </CardContent>
           </Card>
@@ -46,9 +194,9 @@ export default function AdminDashboard() {
               <BookCheck className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">+{stats.newBookings}</div>
               <p className="text-xs text-muted-foreground">
-                No new bookings this week
+                in the last 7 days
               </p>
             </CardContent>
           </Card>
@@ -58,9 +206,9 @@ export default function AdminDashboard() {
               <LifeBuoy className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">{stats.openTickets}</div>
               <p className="text-xs text-muted-foreground">
-                No open tickets
+                Support tickets awaiting response
               </p>
             </CardContent>
           </Card>
@@ -76,8 +224,8 @@ export default function AdminDashboard() {
                     <ResponsiveContainer width="100%" height={300}>
                         <BarChart data={occupancyData}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
+                            <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                            <YAxis fontSize={12} tickLine={false} axisLine={false} />
                             <Tooltip
                               contentStyle={{
                                 background: "hsl(var(--background))",
@@ -85,8 +233,8 @@ export default function AdminDashboard() {
                                 borderRadius: "var(--radius)",
                               }}
                             />
-                            <Bar dataKey="occupied" fill="hsl(var(--primary))" name="Occupied" />
-                            <Bar dataKey="total" fill="hsl(var(--muted))" name="Total" />
+                            <Bar dataKey="occupied" fill="hsl(var(--primary))" name="Occupied" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="total" fill="hsl(var(--muted))" name="Total" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
                   ) : (
@@ -106,8 +254,8 @@ export default function AdminDashboard() {
                       <ResponsiveContainer width="100%" height={300}>
                          <BarChart data={ticketsData}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="month" />
-                            <YAxis />
+                            <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
+                            <YAxis fontSize={12} tickLine={false} axisLine={false} />
                              <Tooltip
                               contentStyle={{
                                 background: "hsl(var(--background))",
@@ -115,8 +263,8 @@ export default function AdminDashboard() {
                                 borderRadius: "var(--radius)",
                               }}
                             />
-                            <Bar dataKey="open" stackId="a" fill="hsl(var(--destructive))" name="Open"/>
-                            <Bar dataKey="closed" stackId="a" fill="hsl(var(--primary))" name="Closed"/>
+                            <Bar dataKey="open" stackId="a" fill="hsl(var(--destructive))" name="Open" radius={[4, 4, 0, 0]}/>
+                            <Bar dataKey="closed" stackId="a" fill="hsl(var(--primary))" name="Closed" radius={[4, 4, 0, 0]}/>
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (
