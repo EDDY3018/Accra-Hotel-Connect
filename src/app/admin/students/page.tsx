@@ -2,6 +2,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import {
   Table,
   TableBody,
@@ -42,9 +45,10 @@ import 'jspdf-autotable';
 import type { UserOptions } from 'jspdf-autotable';
 import Papa from 'papaparse';
 import { auth, db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, writeBatch, getDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: UserOptions) => jsPDFWithAutoTable;
@@ -60,11 +64,38 @@ interface Student {
     totalFee: number; // For calculating payment status
 }
 
+const addStudentSchema = z.object({
+    fullName: z.string().min(2, "Full name is required."),
+    studentId: z.string().min(3, "Student ID is required."),
+    email: z.string().email("Invalid email address."),
+    phone: z.string().regex(/^\+?[0-9\s-]{10,15}$/, "Please enter a valid phone number."),
+    roomNumber: z.string().min(1, "Room number is required."),
+    totalFee: z.preprocess(val => Number(val), z.number().positive("Total fee must be a positive number.")),
+    amountPaid: z.preprocess(val => Number(val), z.number().min(0, "Amount paid cannot be negative.")),
+}).refine(data => data.amountPaid <= data.totalFee, {
+    message: "Amount paid cannot exceed total fee.",
+    path: ["amountPaid"],
+});
+
 
 export default function AdminStudentsPage() {
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddStudentOpen, setAddStudentOpen] = useState(false);
+
+  const form = useForm<z.infer<typeof addStudentSchema>>({
+    resolver: zodResolver(addStudentSchema),
+    defaultValues: {
+      fullName: '',
+      studentId: '',
+      email: '',
+      phone: '',
+      roomNumber: '',
+      totalFee: 0,
+      amountPaid: 0,
+    },
+  });
 
   const fetchStudents = async () => {
     setIsLoading(true);
@@ -85,10 +116,7 @@ export default function AdminStudentsPage() {
                 email: data.email || 'N/A',
                 roomNumber: data.roomNumber || 'Unassigned',
                 outstandingBalance: data.outstandingBalance || 0,
-                // Assuming total fee could be derived or stored. Placeholder for now.
-                // For accurate status, we need to know the original fee.
-                // This is a simplification.
-                totalFee: (data.outstandingBalance || 0) > 0 ? (data.outstandingBalance + 1) : 0, 
+                totalFee: data.totalFee || 0,
             };
         });
         setStudents(fetchedStudents);
@@ -157,10 +185,61 @@ export default function AdminStudentsPage() {
   
   const getPaymentStatus = (balance: number, total: number) => {
     if (balance <= 0) return "Paid";
-    // This is a simplification. A real total fee would be needed for "Unpaid"
-    if (balance > 0) return "Partial"; 
+    if (balance > 0 && balance < total) return "Partial"; 
     return "Unpaid";
   }
+
+  async function onAddStudentSubmit(values: z.infer<typeof addStudentSchema>) {
+    const manager = auth.currentUser;
+    if (!manager) {
+        toast({ variant: "destructive", title: "Not authenticated" });
+        return;
+    }
+
+    const tempPassword = "password123";
+    
+    // We cannot create a user with the main `auth` object, because it might be signed in as the manager.
+    // So we need a secondary app instance. A bit hacky but works for this scenario.
+    // In a real app, this would be done on a backend server with the Admin SDK.
+    try {
+        // Since we can't have multiple auth instances client-side easily without a separate app,
+        // we'll create the user doc first and skip auth creation for this demo.
+        // A real implementation would use a Cloud Function.
+        
+        const studentData = {
+            role: 'student',
+            managerUid: manager.uid,
+            fullName: values.fullName,
+            studentId: values.studentId,
+            email: values.email,
+            phone: values.phone,
+            roomNumber: values.roomNumber,
+            totalFee: values.totalFee,
+            outstandingBalance: values.totalFee - values.amountPaid,
+            createdAt: serverTimestamp(),
+            // We can't create the auth user here client-side without logging out the manager.
+            // So we'll just create the Firestore record.
+        };
+
+        // Create a new document reference with an auto-generated ID
+        const newStudentRef = doc(collection(db, 'users'));
+        await setDoc(newStudentRef, studentData);
+
+        toast({ 
+            title: "Student Added Successfully!",
+            description: `A profile for ${values.fullName} has been created. Auth account creation is skipped in this demo.`
+        });
+        
+        form.reset();
+        setAddStudentOpen(false);
+        fetchStudents(); // Refresh the list
+    } catch (error: any) {
+        console.error("Error adding student:", error);
+        toast({ variant: "destructive", title: "Failed to Add Student", description: error.message });
+    }
+  }
+  
+  const { isSubmitting } = form.formState;
 
   return (
     <Card>
@@ -186,7 +265,7 @@ export default function AdminStudentsPage() {
                     </DropdownMenuContent>
                 </DropdownMenu>
             )}
-            <Dialog>
+            <Dialog open={isAddStudentOpen} onOpenChange={setAddStudentOpen}>
                 <DialogTrigger asChild>
                     <Button>
                         <PlusCircle className="mr-2 h-4 w-4" /> Add Student
@@ -196,43 +275,41 @@ export default function AdminStudentsPage() {
                     <DialogHeader>
                         <DialogTitle>Add New Student</DialogTitle>
                         <DialogDescription>
-                            Manually add a student to the system. An account will be created for them.
+                            Manually add a student to the system.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="full-name" className="text-right">Full Name</Label>
-                            <Input id="full-name" placeholder="e.g., John Doe" className="col-span-3" />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="student-id" className="text-right">Student ID</Label>
-                            <Input id="student-id" placeholder="e.g., 01241234B" className="col-span-3" />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="email" className="text-right">Email</Label>
-                            <Input id="email" type="email" placeholder="student@school.com" className="col-span-3" />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="phone" className="text-right">Phone</Label>
-                            <Input id="phone" type="tel" placeholder="+233 12 345 6789" className="col-span-3" />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="room-no" className="text-right">Room No.</Label>
-                            <Input id="room-no" placeholder="e.g., E501" className="col-span-3" />
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="total-fee">Total Fee (GHS)</Label>
-                                <Input id="total-fee" type="number" placeholder="5000" />
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onAddStudentSubmit)} id="add-student-form" className="grid gap-4 py-4">
+                            <FormField control={form.control} name="fullName" render={({ field }) => (
+                                <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g., John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                             <FormField control={form.control} name="studentId" render={({ field }) => (
+                                <FormItem><FormLabel>Student ID</FormLabel><FormControl><Input placeholder="e.g., 01241234B" {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                            <FormField control={form.control} name="email" render={({ field }) => (
+                                <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="student@school.com" {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                             <FormField control={form.control} name="phone" render={({ field }) => (
+                                <FormItem><FormLabel>Phone</FormLabel><FormControl><Input type="tel" placeholder="+233 12 345 6789" {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                            <FormField control={form.control} name="roomNumber" render={({ field }) => (
+                                <FormItem><FormLabel>Room No.</FormLabel><FormControl><Input placeholder="e.g., E501" {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                            <div className="grid grid-cols-2 gap-4">
+                               <FormField control={form.control} name="totalFee" render={({ field }) => (
+                                    <FormItem><FormLabel>Total Fee (GHS)</FormLabel><FormControl><Input type="number" placeholder="5000" {...field} /></FormControl><FormMessage /></FormItem>
+                                )} />
+                               <FormField control={form.control} name="amountPaid" render={({ field }) => (
+                                    <FormItem><FormLabel>Amount Paid (GHS)</FormLabel><FormControl><Input type="number" placeholder="2500" {...field} /></FormControl><FormMessage /></FormItem>
+                                )} />
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="amount-paid">Amount Paid (GHS)</Label>
-                                <Input id="amount-paid" type="number" placeholder="2500" />
-                            </div>
-                        </div>
-                    </div>
+                        </form>
+                    </Form>
                     <DialogFooter>
-                        <Button type="submit">Save Student</Button>
+                        <Button variant="outline" onClick={() => setAddStudentOpen(false)}>Cancel</Button>
+                        <Button type="submit" form="add-student-form" disabled={isSubmitting}>
+                            {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Saving...</> : "Save Student"}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
