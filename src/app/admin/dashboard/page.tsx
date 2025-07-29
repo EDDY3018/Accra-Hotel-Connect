@@ -46,11 +46,10 @@ export default function AdminDashboard() {
 
       try {
         // --- Fetch all data in parallel ---
-        const [roomsSnapshot, ticketsSnapshot, bookingsSnapshot, studentsSnapshot] = await Promise.all([
+        const [roomsSnapshot, ticketsSnapshot, bookingsSnapshot] = await Promise.all([
           getDocs(query(collection(db, "rooms"), where("managerUid", "==", managerUid))),
           getDocs(query(collection(db, "tickets"), where("managerUid", "==", managerUid))),
           getDocs(query(collection(db, "bookings"), where("managerUid", "==", managerUid))),
-          getDocs(query(collection(db, "users"), where("role", "==", "student"), where("managerUid", "==", managerUid))),
         ]);
 
         // --- Process Rooms & Occupancy ---
@@ -72,19 +71,24 @@ export default function AdminDashboard() {
         }, {} as { [key: string]: OccupancyData });
         setOccupancyData(Object.values(roomTypeCounts));
 
-        // --- Process Bookings ---
+        // --- Process Bookings & Students ---
         const oneWeekAgo = Timestamp.now().toMillis() - 7 * 24 * 60 * 60 * 1000;
         const newBookings = bookingsSnapshot.docs.filter(doc => {
             const bookingDate = new Date(doc.data().bookingDate).getTime();
             return bookingDate >= oneWeekAgo;
         }).length;
         
+        // Derive unique students from bookings
+        const studentUids = new Set(bookingsSnapshot.docs.map(doc => doc.data().studentUid));
+        const totalStudents = studentUids.size;
+
         // --- Process Tickets ---
         const openTickets = ticketsSnapshot.docs.filter(doc => doc.data().status === 'Open').length;
 
         const monthlyTickets = ticketsSnapshot.docs.reduce((acc, doc) => {
             const ticket = doc.data();
-            const month = ticket.createdAt.toDate().toLocaleString('default', { month: 'short' });
+            const createdAtDate = ticket.createdAt?.toDate ? ticket.createdAt.toDate() : new Date();
+            const month = createdAtDate.toLocaleString('default', { month: 'short' });
             if (!acc[month]) {
                 acc[month] = { month, open: 0, closed: 0 };
             }
@@ -97,11 +101,9 @@ export default function AdminDashboard() {
         }, {} as { [key: string]: TicketsData });
         setTicketsData(Object.values(monthlyTickets));
 
-        // --- Process Students ---
-        const totalStudents = studentsSnapshot.size;
 
         setStats({
-          totalStudents: totalStudents,
+          totalStudents,
           occupancyRate: Math.round(occupancyRate),
           newBookings,
           openTickets,
@@ -278,5 +280,3 @@ export default function AdminDashboard() {
     </>
   )
 }
-
-    
