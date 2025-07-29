@@ -6,29 +6,34 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Bell, FileWarning, BedDouble } from "lucide-react";
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 const announcements: any[] = [];
 
 interface RoomInfo {
   id: string;
+  roomNumber: string;
   name: string;
 }
 
 interface PaymentInfo {
   balance: number;
   dueDate: string;
+  bookingId: string | null;
 }
 
 export default function StudentDashboardPage() {
+  const { toast } = useToast();
   const [userName, setUserName] = useState('');
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPaying, setIsPaying] = useState(false);
 
-  useEffect(() => {
-    const fetchUserData = async () => {
+  const fetchUserData = async () => {
+      setIsLoading(true);
       const user = auth.currentUser;
       if (user) {
         try {
@@ -39,7 +44,6 @@ export default function StudentDashboardPage() {
             const fullName = userData.fullName || '';
             setUserName(fullName.split(' ')[0]);
 
-            // Fetch room info if roomId exists
             if (userData.roomId) {
               const roomDocRef = doc(db, 'rooms', userData.roomId);
               const roomDoc = await getDoc(roomDocRef);
@@ -47,16 +51,28 @@ export default function StudentDashboardPage() {
                 const roomData = roomDoc.data();
                 setRoomInfo({
                   id: roomDoc.id,
+                  roomNumber: roomData.roomNumber || 'N/A',
                   name: roomData.name || 'Room details not found'
                 });
               }
+            } else {
+              setRoomInfo(null);
+            }
+            
+            let bookingId = null;
+            if(userData.outstandingBalance > 0 && userData.roomId) {
+              const bookingsQuery = query(collection(db, "bookings"), where("studentUid", "==", user.uid), where("status", "==", "Unpaid"));
+              const querySnapshot = await getDocs(bookingsQuery);
+              if (!querySnapshot.empty) {
+                  bookingId = querySnapshot.docs[0].id;
+              }
             }
 
-            // Set payment info if it exists
             if (userData.outstandingBalance && userData.outstandingBalance > 0) {
               setPaymentInfo({
                 balance: userData.outstandingBalance,
-                dueDate: userData.dueDate || 'Not specified'
+                dueDate: userData.dueDate ? new Date(userData.dueDate).toLocaleDateString() : 'Not specified',
+                bookingId: bookingId,
               });
             } else {
               setPaymentInfo(null);
@@ -71,7 +87,8 @@ export default function StudentDashboardPage() {
         setIsLoading(false);
       }
     };
-
+  
+  useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(user => {
         if (user) {
             fetchUserData();
@@ -82,6 +99,51 @@ export default function StudentDashboardPage() {
 
     return () => unsubscribe();
   }, []);
+  
+  const handlePayNow = async () => {
+    if (!paymentInfo || !paymentInfo.bookingId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No active booking found to pay for.' });
+      return;
+    }
+    setIsPaying(true);
+    
+    // This is a placeholder for a real payment gateway integration
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not authenticated");
+      
+      const batch = writeBatch(db);
+
+      // 1. Update the user's balance
+      const userRef = doc(db, 'users', user.uid);
+      batch.update(userRef, { outstandingBalance: 0 });
+
+      // 2. Update the booking status
+      const bookingRef = doc(db, 'bookings', paymentInfo.bookingId);
+      batch.update(bookingRef, { status: 'Paid' });
+
+      // 3. Create a payment history record
+      const paymentRef = doc(collection(db, 'payments'));
+      batch.set(paymentRef, {
+          studentUid: user.uid,
+          bookingId: paymentInfo.bookingId,
+          amount: paymentInfo.balance,
+          paymentDate: new Date().toISOString(),
+          paymentMethod: 'Simulated Gateway',
+          status: 'Paid'
+      });
+      
+      await batch.commit();
+
+      toast({ title: 'Payment Successful!', description: 'Your payment has been recorded.' });
+      fetchUserData(); // Refresh data
+    } catch (error) {
+      console.error("Payment simulation failed:", error);
+      toast({ variant: 'destructive', title: 'Payment Failed', description: 'Could not process payment. Please try again.' });
+    } finally {
+      setIsPaying(false);
+    }
+  };
 
   return (
     <>
@@ -103,13 +165,13 @@ export default function StudentDashboardPage() {
                   <h3 className="font-semibold">Your Room</h3>
                 </div>
                 {isLoading ? (
-                  <>
-                    <Skeleton className="h-7 w-20 mb-2" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-7 w-20" />
                     <Skeleton className="h-4 w-32" />
-                  </>
+                  </div>
                 ) : roomInfo ? (
                   <>
-                    <p className="text-2xl font-bold">{roomInfo.id}</p>
+                    <p className="text-2xl font-bold">{roomInfo.roomNumber}</p>
                     <p className="text-sm text-muted-foreground">{roomInfo.name}</p>
                   </>
                 ) : (
@@ -129,10 +191,10 @@ export default function StudentDashboardPage() {
                   <h3 className="font-semibold">Outstanding Balance</h3>
                 </div>
                 {isLoading ? (
-                  <>
-                    <Skeleton className="h-7 w-28 mb-2" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-7 w-28" />
                     <Skeleton className="h-4 w-24" />
-                  </>
+                  </div>
                 ) : paymentInfo && paymentInfo.balance > 0 ? (
                   <>
                     <p className="text-2xl font-bold">GHS {paymentInfo.balance.toFixed(2)}</p>
@@ -143,7 +205,9 @@ export default function StudentDashboardPage() {
                 )}
               </div>
                {!isLoading && paymentInfo && paymentInfo.balance > 0 && (
-                  <Button size="sm" className="mt-auto w-fit">Pay Now</Button>
+                  <Button size="sm" className="mt-auto w-fit" onClick={handlePayNow} disabled={isPaying}>
+                    {isPaying ? 'Processing...' : 'Pay Now'}
+                  </Button>
                )}
             </div>
           </CardContent>
