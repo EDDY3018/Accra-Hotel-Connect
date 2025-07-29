@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -77,8 +77,10 @@ type RoomDetails = {
   managerUid: string;
 };
 
-export default function RoomDetailPage({ params }: { params: { id: string } }) {
+export default function RoomDetailPage() {
   const router = useRouter();
+  const params = useParams();
+  const { id } = params as { id: string };
   const { toast } = useToast();
   const [roomDetails, setRoomDetails] = useState<RoomDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,10 +95,10 @@ export default function RoomDetailPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     async function getRoomDetails() {
-      if (!params.id) return;
+      if (!id) return;
       setIsLoading(true);
       try {
-        const roomRef = doc(db, 'rooms', params.id);
+        const roomRef = doc(db, 'rooms', id);
         const roomSnap = await getDoc(roomRef);
 
         if (roomSnap.exists()) {
@@ -131,7 +133,7 @@ export default function RoomDetailPage({ params }: { params: { id: string } }) {
     });
 
     return () => unsubscribe();
-  }, [params.id, form, toast]);
+  }, [id, form, toast]);
 
   const { isSubmitting } = form.formState;
 
