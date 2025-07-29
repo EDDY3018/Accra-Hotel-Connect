@@ -174,13 +174,14 @@ export default function RoomDetailPage() {
         const roomRef = doc(db, 'rooms', roomDetails.id);
         batch.update(roomRef, { status: 'Occupied' });
 
-        // 3. Update the user's profile with the new room
+        // 3. Update the user's profile with the new room and associate with manager
         const userRef = doc(db, 'users', user.uid);
         batch.update(userRef, {
             roomId: roomDetails.id,
             roomNumber: roomDetails.roomNumber,
             outstandingBalance: roomDetails.price,
-            dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0] // Due in 1 month
+            dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0], // Due in 1 month
+            managerUid: roomDetails.managerUid // Link student to manager
         });
 
         await batch.commit();

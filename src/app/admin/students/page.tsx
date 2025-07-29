@@ -1,5 +1,7 @@
+
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -18,7 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { FileDown, PlusCircle, Search } from "lucide-react";
+import { FileDown, PlusCircle, Search, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -39,25 +41,83 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import type { UserOptions } from 'jspdf-autotable';
 import Papa from 'papaparse';
+import { auth, db } from '@/lib/firebase';
+import { collection, query, where, getDocs, doc, writeBatch, getDoc, serverTimestamp } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 
-// Define the interface for jsPDF with autoTable to satisfy TypeScript
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: UserOptions) => jsPDFWithAutoTable;
 }
 
-const students: any[] = [];
+interface Student {
+    id: string;
+    fullName: string;
+    studentId: string;
+    email: string;
+    roomNumber: string;
+    outstandingBalance: number;
+    totalFee: number; // For calculating payment status
+}
 
 
 export default function AdminStudentsPage() {
+  const { toast } = useToast();
+  const [students, setStudents] = useState<Student[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchStudents = async () => {
+    setIsLoading(true);
+    const user = auth.currentUser;
+    if (!user) {
+        setIsLoading(false);
+        return;
+    }
+    try {
+        const studentsQuery = query(collection(db, 'users'), where('role', '==', 'student'), where('managerUid', '==', user.uid));
+        const querySnapshot = await getDocs(studentsQuery);
+        const fetchedStudents = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                fullName: data.fullName || 'N/A',
+                studentId: data.studentId || 'N/A',
+                email: data.email || 'N/A',
+                roomNumber: data.roomNumber || 'Unassigned',
+                outstandingBalance: data.outstandingBalance || 0,
+                // Assuming total fee could be derived or stored. Placeholder for now.
+                // For accurate status, we need to know the original fee.
+                // This is a simplification.
+                totalFee: (data.outstandingBalance || 0) > 0 ? (data.outstandingBalance + 1) : 0, 
+            };
+        });
+        setStudents(fetchedStudents);
+    } catch (error) {
+        console.error("Error fetching students:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch students. Check Firestore rules.' });
+    } finally {
+        setIsLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      if (user) {
+        fetchStudents();
+      } else {
+        setIsLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleExportCSV = () => {
-    const csvData = students.map(({ id, name, email, room, paymentStatus, balance }) => ({
-        'Student ID': id,
-        'Name': name,
+    const csvData = students.map(({ studentId, fullName, email, roomNumber, outstandingBalance }) => ({
+        'Student ID': studentId,
+        'Name': fullName,
         'Email': email,
-        'Room No.': room,
-        'Payment Status': paymentStatus,
-        'Outstanding Balance (GHS)': balance.toFixed(2),
+        'Room No.': roomNumber,
+        'Outstanding Balance (GHS)': outstandingBalance.toFixed(2),
     }));
     const csv = Papa.unparse(csvData);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -77,23 +137,36 @@ export default function AdminStudentsPage() {
     const doc = new jsPDF() as jsPDFWithAutoTable;
     doc.autoTable({
       head: [['Student ID', 'Name', 'Email', 'Room No.', 'Payment Status', 'Outstanding (GHS)']],
-      body: students.map((student: any) => [
-        student.id,
-        student.name,
-        student.email,
-        student.room,
-        student.paymentStatus,
-        student.balance.toFixed(2)
-      ]),
+      body: students.map((student) => {
+        let paymentStatus = 'Paid';
+        if (student.outstandingBalance > 0) {
+            paymentStatus = 'Partial'; // Or Unpaid if balance equals total fee
+        }
+        return [
+            student.studentId,
+            student.fullName,
+            student.email,
+            student.roomNumber,
+            paymentStatus,
+            student.outstandingBalance.toFixed(2)
+        ]
+      }),
     });
     doc.save('students.pdf');
   };
+  
+  const getPaymentStatus = (balance: number, total: number) => {
+    if (balance <= 0) return "Paid";
+    // This is a simplification. A real total fee would be needed for "Unpaid"
+    if (balance > 0) return "Partial"; 
+    return "Unpaid";
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="font-headline">Students</CardTitle>
-        <CardDescription>Manage student information and payment status.</CardDescription>
+        <CardDescription>Manage student information and payment status for your hostel.</CardDescription>
         <div className="flex items-center justify-between gap-2 pt-4">
           <div className="relative w-full md:w-1/3">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -179,43 +252,39 @@ export default function AdminStudentsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-             {students.length === 0 ? (
+             {isLoading ? (
                 <TableRow>
-                    <TableCell colSpan={6} className="text-center">No students found.</TableCell>
+                    <TableCell colSpan={6} className="text-center py-10">
+                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+                    </TableCell>
+                </TableRow>
+             ) : students.length === 0 ? (
+                <TableRow>
+                    <TableCell colSpan={6} className="text-center">No students found for your hostel.</TableCell>
                 </TableRow>
             ) : (
-                students.map((student: any) => (
-                  <TableRow key={student.id}>
-                    <TableCell className="font-medium">{student.id}</TableCell>
-                    <TableCell>{student.name}</TableCell>
-                    <TableCell>{student.email}</TableCell>
-                    <TableCell>{student.room}</TableCell>
-                    <TableCell>
-                      <Badge variant={
-                        student.paymentStatus === "Paid" ? "default" :
-                        student.paymentStatus === "Partial" ? "secondary" : "destructive"
-                      }>
-                        {student.paymentStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                        {student.paymentStatus === 'Partial' && (
-                            <div>
-                                <span className="line-through text-muted-foreground/80 mr-2">
-                                    GHS {student.totalFee.toFixed(2)}
-                                </span>
-                                <span>GHS {student.balance.toFixed(2)}</span>
-                            </div>
-                        )}
-                         {student.paymentStatus === 'Unpaid' && (
-                             <span>GHS {student.balance.toFixed(2)}</span>
-                        )}
-                        {student.paymentStatus === 'Paid' && (
-                             <span>GHS 0.00</span>
-                        )}
-                    </TableCell>
-                  </TableRow>
-                ))
+                students.map((student) => {
+                    const paymentStatus = getPaymentStatus(student.outstandingBalance, student.totalFee);
+                    return (
+                      <TableRow key={student.id}>
+                        <TableCell className="font-medium">{student.studentId}</TableCell>
+                        <TableCell>{student.fullName}</TableCell>
+                        <TableCell>{student.email}</TableCell>
+                        <TableCell>{student.roomNumber}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            paymentStatus === "Paid" ? "default" :
+                            paymentStatus === "Partial" ? "secondary" : "destructive"
+                          }>
+                            {paymentStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                           <span>GHS {student.outstandingBalance.toFixed(2)}</span>
+                        </TableCell>
+                      </TableRow>
+                    )
+                })
             )}
           </TableBody>
         </Table>
