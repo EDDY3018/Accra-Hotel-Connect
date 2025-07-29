@@ -106,14 +106,26 @@ export default function SupportPage() {
             const userDocRef = doc(db, 'users', user.uid);
             const userDoc = await getDoc(userDocRef);
             
-            if (!userDoc.exists()) {
-                 toast({ variant: "destructive", title: "User Not Found", description: "Your user profile could not be found." });
+            if (!userDoc.exists() || !userDoc.data()?.roomId) {
+                 toast({ variant: "destructive", title: "User or Room Not Found", description: "You must be assigned to a room to submit a ticket." });
                  return;
             }
             const userData = userDoc.data();
 
+            const roomDocRef = doc(db, 'rooms', userData.roomId);
+            const roomDoc = await getDoc(roomDocRef);
+
+            if (!roomDoc.exists()) {
+                toast({ variant: "destructive", title: "Room Details Not Found", description: "Could not find details for your assigned room." });
+                return;
+            }
+            const roomData = roomDoc.data();
+            const managerUid = roomData.managerUid;
+
+
             await addDoc(collection(db, 'tickets'), {
                 studentUid: user.uid,
+                managerUid: managerUid,
                 studentName: userData.fullName || 'N/A',
                 studentId: userData.studentId || 'N/A',
                 roomNumber: userData.roomNumber || 'N/A',
@@ -182,6 +194,7 @@ export default function SupportPage() {
                                 <div className="border-t pt-4">
                                   <p className="font-semibold mb-1">Admin response:</p>
                                   <p className="text-sm text-foreground/80">{ticket.response || "Awaiting response from admin."}</p>
+
                                 </div>
                             </div>
                         </AccordionContent>
