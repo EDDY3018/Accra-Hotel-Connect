@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -80,7 +81,7 @@ type RoomDetails = {
 export default function RoomDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const { id } = params as { id: string };
+  const id = params.id as string;
   const { toast } = useToast();
   const [roomDetails, setRoomDetails] = useState<RoomDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -187,9 +188,13 @@ export default function RoomDetailPage() {
         toast({ title: 'Booking Successful!', description: "Your room has been secured. Redirecting to dashboard..." });
         router.push('/student/dashboard');
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error booking room:", error);
-        toast({ variant: 'destructive', title: 'Booking Failed', description: 'Could not complete the booking. Please check your Firestore rules and try again.' });
+        let description = 'Could not complete the booking. Please try again.';
+        if (error.code === 'permission-denied' || error.code === 'firestore/permission-denied') {
+            description = 'You do not have permission to book this room. Please check Firestore security rules for booking and room updates.';
+        }
+        toast({ variant: 'destructive', title: 'Booking Failed', description });
     }
   }
 
