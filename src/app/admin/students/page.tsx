@@ -47,7 +47,6 @@ import Papa from 'papaparse';
 import { auth, db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 interface jsPDFWithAutoTable extends jsPDF {
@@ -196,16 +195,7 @@ export default function AdminStudentsPage() {
         return;
     }
 
-    const tempPassword = "password123";
-    
-    // We cannot create a user with the main `auth` object, because it might be signed in as the manager.
-    // So we need a secondary app instance. A bit hacky but works for this scenario.
-    // In a real app, this would be done on a backend server with the Admin SDK.
     try {
-        // Since we can't have multiple auth instances client-side easily without a separate app,
-        // we'll create the user doc first and skip auth creation for this demo.
-        // A real implementation would use a Cloud Function.
-        
         const studentData = {
             role: 'student',
             managerUid: manager.uid,
@@ -217,17 +207,16 @@ export default function AdminStudentsPage() {
             totalFee: values.totalFee,
             outstandingBalance: values.totalFee - values.amountPaid,
             createdAt: serverTimestamp(),
-            // We can't create the auth user here client-side without logging out the manager.
-            // So we'll just create the Firestore record.
+            // We cannot create the auth user here client-side without logging out the manager.
+            // So we'll just create the Firestore record. The student can sign up later with this email.
         };
 
-        // Create a new document reference with an auto-generated ID
         const newStudentRef = doc(collection(db, 'users'));
         await setDoc(newStudentRef, studentData);
 
         toast({ 
-            title: "Student Added Successfully!",
-            description: `A profile for ${values.fullName} has been created. Auth account creation is skipped in this demo.`
+            title: "Student Profile Created!",
+            description: `${values.fullName} has been added. They can sign up with their email later.`
         });
         
         form.reset();
@@ -235,7 +224,7 @@ export default function AdminStudentsPage() {
         fetchStudents(); // Refresh the list
     } catch (error: any) {
         console.error("Error adding student:", error);
-        toast({ variant: "destructive", title: "Failed to Add Student", description: error.message });
+        toast({ variant: "destructive", title: "Failed to Add Student", description: "Could not save the student profile. " + error.message });
     }
   }
   
