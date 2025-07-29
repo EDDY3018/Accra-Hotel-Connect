@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Bell, FileWarning, BedDouble } from "lucide-react";
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, collection, addDoc, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 
@@ -78,8 +79,9 @@ export default function StudentDashboardPage() {
               setPaymentInfo(null);
             }
           }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error fetching user data:", error);
+            toast({ variant: 'destructive', title: 'Error loading dashboard', description: 'Could not fetch your data. See console for details.' });
         } finally {
             setIsLoading(false);
         }
@@ -107,22 +109,18 @@ export default function StudentDashboardPage() {
     }
     setIsPaying(true);
     
-    // This is a placeholder for a real payment gateway integration
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("User not authenticated");
       
       const batch = writeBatch(db);
 
-      // 1. Update the user's balance
       const userRef = doc(db, 'users', user.uid);
       batch.update(userRef, { outstandingBalance: 0 });
 
-      // 2. Update the booking status
       const bookingRef = doc(db, 'bookings', paymentInfo.bookingId);
       batch.update(bookingRef, { status: 'Paid' });
 
-      // 3. Create a payment history record
       const paymentRef = doc(collection(db, 'payments'));
       batch.set(paymentRef, {
           studentUid: user.uid,
@@ -137,9 +135,9 @@ export default function StudentDashboardPage() {
 
       toast({ title: 'Payment Successful!', description: 'Your payment has been recorded.' });
       fetchUserData(); // Refresh data
-    } catch (error) {
+    } catch (error: any) {
       console.error("Payment simulation failed:", error);
-      toast({ variant: 'destructive', title: 'Payment Failed', description: 'Could not process payment. Please try again.' });
+      toast({ variant: 'destructive', title: 'Payment Failed', description: 'Could not process payment. See console for details.' });
     } finally {
       setIsPaying(false);
     }
@@ -239,3 +237,5 @@ export default function StudentDashboardPage() {
     </>
   );
 }
+
+    

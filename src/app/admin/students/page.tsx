@@ -119,9 +119,9 @@ export default function AdminStudentsPage() {
             };
         });
         setStudents(fetchedStudents);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error fetching students:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch students. Check Firestore rules.' });
+        toast({ variant: 'destructive', title: 'Error fetching students', description: 'Could not fetch students. Check console for details.' });
     } finally {
         setIsLoading(false);
     }
@@ -207,8 +207,6 @@ export default function AdminStudentsPage() {
             totalFee: values.totalFee,
             outstandingBalance: values.totalFee - values.amountPaid,
             createdAt: serverTimestamp(),
-            // We cannot create the auth user here client-side without logging out the manager.
-            // So we'll just create the Firestore record. The student can sign up later with this email.
         };
 
         const newStudentRef = doc(collection(db, 'users'));
@@ -224,7 +222,7 @@ export default function AdminStudentsPage() {
         fetchStudents(); // Refresh the list
     } catch (error: any) {
         console.error("Error adding student:", error);
-        toast({ variant: "destructive", title: "Failed to Add Student", description: "Could not save the student profile. " + error.message });
+        toast({ variant: "destructive", title: "Failed to Add Student", description: "Could not save the student profile. See console for details." });
     }
   }
   
@@ -358,3 +356,5 @@ export default function AdminStudentsPage() {
     </Card>
   )
 }
+
+    

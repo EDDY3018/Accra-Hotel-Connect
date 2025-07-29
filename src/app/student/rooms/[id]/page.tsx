@@ -107,12 +107,12 @@ export default function RoomDetailPage() {
         } else {
             toast({ variant: 'destructive', title: 'Error', description: 'Room not found.' });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching room details:', error);
         toast({
           variant: 'destructive',
-          title: 'Error',
-          description: 'Could not fetch room details.',
+          title: 'Error fetching room',
+          description: 'Could not fetch room details. See console.',
         });
       }
     }
@@ -129,7 +129,6 @@ export default function RoomDetailPage() {
           });
         }
       }
-      // Only fetch room details after we have auth state
       getRoomDetails().finally(() => setIsLoading(false));
     });
 
@@ -156,7 +155,6 @@ export default function RoomDetailPage() {
     try {
         const batch = writeBatch(db);
 
-        // 1. Create a new booking document
         const bookingRef = doc(db, 'bookings', `${user.uid}_${roomDetails.id}`);
         batch.set(bookingRef, {
             studentUid: user.uid,
@@ -170,18 +168,16 @@ export default function RoomDetailPage() {
             status: 'Unpaid'
         });
 
-        // 2. Update the room status to 'Occupied'
         const roomRef = doc(db, 'rooms', roomDetails.id);
         batch.update(roomRef, { status: 'Occupied' });
 
-        // 3. Update the user's profile with the new room and associate with manager
         const userRef = doc(db, 'users', user.uid);
         batch.update(userRef, {
             roomId: roomDetails.id,
             roomNumber: roomDetails.roomNumber,
             outstandingBalance: roomDetails.price,
-            dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0], // Due in 1 month
-            managerUid: roomDetails.managerUid // Link student to manager
+            dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+            managerUid: roomDetails.managerUid
         });
 
         await batch.commit();
@@ -191,9 +187,9 @@ export default function RoomDetailPage() {
 
     } catch (error: any) {
         console.error("Error booking room:", error);
-        let description = 'Could not complete the booking. Please try again.';
-        if (error.code === 'permission-denied' || error.code === 'firestore/permission-denied') {
-            description = 'You do not have permission to book this room. Please check Firestore security rules for booking and room updates.';
+        let description = 'Could not complete the booking. Please check the console for more details.';
+        if (error.code && error.code.includes('permission-denied')) {
+            description = 'Permission denied. Please check your Firestore security rules.';
         }
         toast({ variant: 'destructive', title: 'Booking Failed', description });
     }
@@ -350,3 +346,5 @@ export default function RoomDetailPage() {
     </div>
   )
 }
+
+    

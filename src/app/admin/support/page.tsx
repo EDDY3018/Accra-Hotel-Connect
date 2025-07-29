@@ -56,9 +56,9 @@ export default function AdminSupportPage() {
         ...doc.data()
       } as Ticket));
       setTickets(fetchedTickets);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching tickets: ", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch support tickets.' });
+      toast({ variant: 'destructive', title: 'Error fetching tickets', description: 'Could not fetch support tickets. See console for details.' });
     } finally {
       setIsLoading(false);
     }
@@ -78,9 +78,9 @@ export default function AdminSupportPage() {
       await updateDoc(ticketRef, { status });
       toast({ title: 'Status Updated', description: `Ticket status changed to ${status}` });
       fetchTickets();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating status: ", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not update ticket status.' });
+      toast({ variant: 'destructive', title: 'Error updating status', description: 'Could not update ticket status. See console for details.' });
     }
   };
 
@@ -102,9 +102,9 @@ export default function AdminSupportPage() {
         toast({ title: 'Response Sent', description: 'Your response has been sent to the student.' });
         fetchTickets(); // Refresh data
         setResponseTexts(prev => ({...prev, [ticketId]: ''}));
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error sending response: ", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not send the response.' });
+        toast({ variant: 'destructive', title: 'Error sending response', description: 'Could not send the response. See console for details.' });
     } finally {
         setIsSubmitting(prev => ({...prev, [ticketId]: false}));
     }
@@ -196,3 +196,5 @@ export default function AdminSupportPage() {
     </Card>
   )
 }
+
+    

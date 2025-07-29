@@ -46,14 +46,12 @@ export default function PaymentsPage() {
   const fetchPaymentHistory = async (user: any) => {
     setIsLoading(true);
     try {
-      // Fetch user info
       const userDocRef = doc(db, 'users', user.uid);
       const userDocSnap = await getDoc(userDocRef);
       if (userDocSnap.exists()) {
         setUserInfo(userDocSnap.data() as { fullName: string, studentId: string });
       }
 
-      // Fetch payments
       const q = query(
         collection(db, 'payments'), 
         where('studentUid', '==', user.uid),
@@ -65,7 +63,6 @@ export default function PaymentsPage() {
         let roomNumber = 'N/A';
         let hostelName = 'N/A';
 
-        // Fetch associated booking to get room details
         if (data.bookingId) {
           const bookingRef = doc(db, 'bookings', data.bookingId);
           const bookingSnap = await getDoc(bookingRef);
@@ -89,9 +86,9 @@ export default function PaymentsPage() {
 
       const history = await Promise.all(historyPromises);
       setPayments(history);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching payment history: ", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your payment history. Check Firestore rules.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your payment history. See console for details.' });
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +113,6 @@ export default function PaymentsPage() {
     
     const doc = new jsPDF();
 
-    // Header
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
     doc.text("Payment Receipt", 105, 20, { align: 'center' });
@@ -125,7 +121,6 @@ export default function PaymentsPage() {
     doc.text(`Hostel: ${payment.hostelName || 'N/A'}`, 105, 30, { align: 'center' });
 
 
-    // Student Info
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Billed To:", 20, 50);
@@ -134,12 +129,10 @@ export default function PaymentsPage() {
     doc.text(userInfo.fullName, 20, 58);
     doc.text(`Student ID: ${userInfo.studentId}`, 20, 64);
 
-    // Payment Details
     doc.text(`Receipt #: ${payment.id}`, 180, 58, { align: 'right' });
     doc.text(`Payment Date: ${payment.paymentDate}`, 180, 64, { align: 'right' });
 
 
-    // Table
     (doc as any).autoTable({
       startY: 80,
       head: [['Description', 'Amount']],
@@ -152,13 +145,11 @@ export default function PaymentsPage() {
     
     const finalY = (doc as any).lastAutoTable.finalY;
 
-    // Total
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Total Paid:", 140, finalY + 15);
     doc.text(`GHS ${payment.amount.toFixed(2)}`, 180, finalY + 15, { align: 'right' });
 
-    // Footer
     doc.setFontSize(10);
     doc.text("Thank you for your payment!", 105, finalY + 40, { align: 'center' });
     doc.text("AccraHostelConnect", 105, finalY + 45, { align: 'center' });
@@ -228,3 +219,5 @@ export default function PaymentsPage() {
     </Card>
   )
 }
+
+    

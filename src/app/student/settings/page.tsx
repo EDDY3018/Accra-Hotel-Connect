@@ -1,3 +1,4 @@
+
 'use client'
 
 import React, { useEffect, useState } from 'react';
@@ -37,24 +38,30 @@ export default function StudentSettingsPage() {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
-        const userDocRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(userDocRef);
-        if (docSnap.exists()) {
-          const userData = docSnap.data();
-          form.reset({
-            fullName: userData.fullName || '',
-            email: userData.email || '',
-            phone: userData.phone || '',
-            studentId: userData.studentId || '',
-          });
+        try {
+            const userDocRef = doc(db, 'users', user.uid);
+            const docSnap = await getDoc(userDocRef);
+            if (docSnap.exists()) {
+              const userData = docSnap.data();
+              form.reset({
+                fullName: userData.fullName || '',
+                email: userData.email || '',
+                phone: userData.phone || '',
+                studentId: userData.studentId || '',
+              });
+            }
+        } catch (error: any) {
+            console.error("Error fetching user profile:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your profile. See console.' });
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
       } else {
         setIsLoading(false);
       }
     });
     return () => unsubscribe();
-  }, [form]);
+  }, [form, toast]);
 
   async function onSubmit(values: z.infer<typeof settingsSchema>) {
     const user = auth.currentUser;
@@ -68,17 +75,18 @@ export default function StudentSettingsPage() {
       await setDoc(userDocRef, { 
         fullName: values.fullName,
         phone: values.phone,
-      }, { merge: true }); // Merge to avoid overwriting other fields like role
+      }, { merge: true });
 
       toast({
         title: "Profile Updated",
         description: "Your information has been saved successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Error updating profile:", error);
       toast({
         variant: "destructive",
         title: "Update Failed",
-        description: "Could not save your changes. Please try again.",
+        description: "Could not save your changes. See console for details.",
       });
     }
   }
@@ -164,3 +172,5 @@ export default function StudentSettingsPage() {
     </Card>
   )
 }
+
+    

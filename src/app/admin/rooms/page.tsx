@@ -104,9 +104,9 @@ export default function AdminRoomsPage() {
       const querySnapshot = await getDocs(roomsQuery);
       const fetchedRooms = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setRooms(fetchedRooms);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching data: ", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your rooms.' });
+      toast({ variant: 'destructive', title: 'Error fetching data', description: 'Could not fetch your rooms. Check console for details.' });
     } finally {
       setIsLoading(false);
     }
@@ -166,7 +166,6 @@ export default function AdminRoomsPage() {
   }, [imagePreviews]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log("Form submission triggered. Values:", values);
     const user = auth.currentUser;
     if (!user || !managerInfo) {
       toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be logged in to add a room.' });
@@ -177,7 +176,6 @@ export default function AdminRoomsPage() {
       const storage = getStorage();
       const imageHints = ["room angle one", "room angle two", "room angle three", "bathroom"];
       
-      console.log("Compressing images...");
       const compressionOptions = {
         maxSizeMB: 0.5,
         maxWidthOrHeight: 1920,
@@ -185,19 +183,11 @@ export default function AdminRoomsPage() {
       };
       const compressedImagePromises = values.images.map(file => imageCompression(file, compressionOptions));
       const compressedImages = await Promise.all(compressedImagePromises);
-      console.log("Image compression complete.");
-
-      console.log("Starting image uploads...");
+      
       const uploadPromises = compressedImages.map(async (file, i) => {
-          console.log(`[Image ${i + 1}] Starting upload for ${file.name}`);
           const fileRef = storageRef(storage, `rooms/${user.uid}/${values.roomNumber}/${file.name}_${Date.now()}`);
-          
           const snapshot = await uploadBytes(fileRef, file);
-          console.log(`[Image ${i + 1}] Upload complete. Getting download URL...`);
-          
           const url = await getDownloadURL(snapshot.ref);
-          console.log(`[Image ${i + 1}] URL retrieved.`);
-          
           return {
               src: url,
               hint: imageHints[i] || "room interior"
@@ -205,8 +195,6 @@ export default function AdminRoomsPage() {
       });
 
       const imageUrls = await Promise.all(uploadPromises);
-      console.log("All image uploads completed. URLs:", imageUrls);
-
 
       const roomData = {
         managerUid: user.uid,
@@ -224,10 +212,8 @@ export default function AdminRoomsPage() {
         createdAt: new Date().toISOString(),
       };
 
-      console.log("About to save to Firestore:", roomData);
       await addDoc(collection(db, 'rooms'), roomData);
-      console.log("Successfully saved to Firestore.");
-
+      
       toast({ title: 'Room Added!', description: 'The new room has been saved successfully.' });
       form.reset();
       setImagePreviews([]);
@@ -235,21 +221,9 @@ export default function AdminRoomsPage() {
       fetchManagerAndRooms();
     } catch (error: any) {
       console.error("Error adding room: ", error);
-      let description = 'Could not save the room. Please try again.';
-      if (error.code) {
-        switch (error.code) {
-          case 'storage/unauthorized':
-            description = 'Permission denied. You are not authorized to upload images. Check your Storage security rules.';
-            break;
-          case 'storage/retry-limit-exceeded':
-            description = 'Network timeout. Please check your internet connection and verify your Storage rules and bucket configuration in .env.';
-            break;
-          case 'firestore/permission-denied':
-             description = 'Permission denied. Your Firestore security rules do not allow you to save this data. Ensure the managerUid in your data matches your authenticated user ID.';
-            break;
-          default:
-            description = `An unexpected error occurred: ${error.message}`;
-        }
+      let description = 'Could not save the room. Please check the console for more details.';
+      if (error.code && error.code.includes('permission-denied')) {
+        description = 'Permission denied. Please check your Firestore or Storage security rules.';
       }
       toast({ variant: 'destructive', title: 'Submission Error', description });
     }
@@ -427,3 +401,5 @@ export default function AdminRoomsPage() {
     </>
   )
 }
+
+    

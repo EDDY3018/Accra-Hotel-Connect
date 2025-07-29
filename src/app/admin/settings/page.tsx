@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -71,25 +72,31 @@ export default function AdminSettingsPage() {
     useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
             if (user) {
-                const userDocRef = doc(db, 'users', user.uid);
-                const docSnap = await getDoc(userDocRef);
-                if (docSnap.exists()) {
-                    const userData = docSnap.data();
-                    profileForm.reset({
-                        fullName: userData.fullName || '',
-                        hostelName: userData.hostelName || '',
-                        location: userData.location || '',
-                        phone: userData.phone || '',
-                        email: user.email || '',
-                    });
+                try {
+                    const userDocRef = doc(db, 'users', user.uid);
+                    const docSnap = await getDoc(userDocRef);
+                    if (docSnap.exists()) {
+                        const userData = docSnap.data();
+                        profileForm.reset({
+                            fullName: userData.fullName || '',
+                            hostelName: userData.hostelName || '',
+                            location: userData.location || '',
+                            phone: userData.phone || '',
+                            email: user.email || '',
+                        });
+                    }
+                } catch (error: any) {
+                    console.error("Error fetching profile:", error);
+                    toast({ variant: "destructive", title: "Fetch Error", description: "Could not load profile. See console." });
+                } finally {
+                    setIsLoading(false);
                 }
-                 setIsLoading(false);
             } else {
                 setIsLoading(false);
             }
         });
         return () => unsubscribe();
-    }, [profileForm]);
+    }, [profileForm, toast]);
 
     async function onProfileSubmit(values: z.infer<typeof profileFormSchema>) {
         const user = auth.currentUser;
@@ -106,8 +113,9 @@ export default function AdminSettingsPage() {
                 phone: values.phone,
             });
             toast({ title: "Profile Updated", description: "Your information has been saved successfully." });
-        } catch (error) {
-            toast({ variant: "destructive", title: "Update Failed", description: "Could not save your changes." });
+        } catch (error: any) {
+            console.error("Error updating profile:", error);
+            toast({ variant: "destructive", title: "Update Failed", description: "Could not save your changes. See console for details." });
         }
     }
 
@@ -126,6 +134,7 @@ export default function AdminSettingsPage() {
             toast({ title: "Password Updated", description: "Your password has been changed successfully." });
             passwordForm.reset();
         } catch (error: any) {
+            console.error("Error updating password:", error);
             toast({ variant: "destructive", title: "Password Update Failed", description: "Please check your current password and try again." });
         }
     }
@@ -295,3 +304,5 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
+
+    

@@ -80,9 +80,9 @@ export default function SupportPage() {
             const querySnapshot = await getDocs(q);
             const userTickets = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ticket));
             setTickets(userTickets);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error fetching tickets:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your support tickets.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your support tickets. See console for details.' });
         } finally {
             setIsLoading(false);
         }
@@ -138,10 +138,10 @@ export default function SupportPage() {
 
             toast({ title: "Ticket Submitted!", description: "We have received your ticket and will get back to you shortly." });
             form.reset();
-            setActiveTab("my-tickets"); // Switch to tickets list
+            setActiveTab("my-tickets");
         } catch (error: any) {
             console.error("Error submitting ticket: ", error);
-            toast({ variant: "destructive", title: "Submission Error", description: "Could not submit your ticket. Check your Firestore rules for 'tickets' collection." });
+            toast({ variant: "destructive", title: "Submission Error", description: "Could not submit your ticket. See console for details." });
         }
     }
 
@@ -243,3 +243,5 @@ export default function SupportPage() {
     </Tabs>
   )
 }
+
+    

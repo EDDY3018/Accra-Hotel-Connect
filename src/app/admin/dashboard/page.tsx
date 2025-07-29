@@ -8,6 +8,7 @@ import { Users, BedDouble, BookCheck, LifeBuoy } from "lucide-react"
 import { auth, db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 interface OccupancyData {
   name: string;
@@ -31,6 +32,7 @@ export default function AdminDashboard() {
   const [occupancyData, setOccupancyData] = useState<OccupancyData[]>([]);
   const [ticketsData, setTicketsData] = useState<TicketsData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -96,14 +98,7 @@ export default function AdminDashboard() {
         setTicketsData(Object.values(monthlyTickets));
 
         // --- Process Students ---
-        // This is a simplified student count. A more robust way would be to query bookings
-        // but for now we'll assume a user with a managerUid is a student of that manager.
-        // We need to add 'managerUid' to user profiles for this to work.
-        const studentsQuery = query(collection(db, 'users'), where('role', '==', 'student'));
-        const allStudentsSnap = await getDocs(studentsQuery);
-        // This is a placeholder since we don't have managerUid on students yet.
-        const totalStudents = allStudentsSnap.size;
-
+        const totalStudents = studentsSnapshot.size;
 
         setStats({
           totalStudents: totalStudents,
@@ -112,8 +107,13 @@ export default function AdminDashboard() {
           openTickets,
         });
 
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching dashboard data: ", error);
+        toast({
+          variant: "destructive",
+          title: "Failed to fetch dashboard data.",
+          description: "Please check your Firestore security rules and network connection. See console for more details.",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -128,7 +128,7 @@ export default function AdminDashboard() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [toast]);
 
   if (isLoading) {
     return (
@@ -278,3 +278,5 @@ export default function AdminDashboard() {
     </>
   )
 }
+
+    
