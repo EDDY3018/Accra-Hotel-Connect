@@ -26,9 +26,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface PaymentHistory {
   id: string;
-  bookingDate: string;
-  roomNumber: string;
-  price: number;
+  paymentDate: string;
+  bookingId: string;
+  amount: number;
   status: 'Paid' | 'Unpaid' | 'Pending';
 }
 
@@ -47,25 +47,25 @@ export default function PaymentsPage() {
 
     try {
       const q = query(
-        collection(db, 'bookings'), 
+        collection(db, 'payments'), 
         where('studentUid', '==', user.uid),
-        orderBy('bookingDate', 'desc')
+        orderBy('paymentDate', 'desc')
       );
       const querySnapshot = await getDocs(q);
       const history = querySnapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
-          bookingDate: new Date(data.bookingDate).toLocaleDateString(),
-          roomNumber: data.roomNumber,
-          price: data.price,
+          paymentDate: new Date(data.paymentDate).toLocaleDateString(),
+          bookingId: data.bookingId,
+          amount: data.amount,
           status: data.status,
         };
       });
       setPayments(history);
     } catch (error) {
       console.error("Error fetching payment history: ", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your payment history.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your payment history. Check Firestore rules for the `payments` collection.' });
     } finally {
       setIsLoading(false);
     }
@@ -98,9 +98,9 @@ export default function PaymentsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Payment ID</TableHead>
               <TableHead>Booking ID</TableHead>
-              <TableHead>Room No.</TableHead>
-              <TableHead>Booking Date</TableHead>
+              <TableHead>Payment Date</TableHead>
               <TableHead>Amount (GHS)</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Action</TableHead>
@@ -123,9 +123,9 @@ export default function PaymentsPage() {
                 payments.map((payment) => (
                   <TableRow key={payment.id}>
                     <TableCell className="font-medium truncate max-w-[100px]">{payment.id}</TableCell>
-                    <TableCell>{payment.roomNumber}</TableCell>
-                    <TableCell>{payment.bookingDate}</TableCell>
-                    <TableCell>{payment.price.toFixed(2)}</TableCell>
+                    <TableCell className="truncate max-w-[100px]">{payment.bookingId}</TableCell>
+                    <TableCell>{payment.paymentDate}</TableCell>
+                    <TableCell>{payment.amount.toFixed(2)}</TableCell>
                     <TableCell>
                       <Badge variant={payment.status === "Paid" ? "default" : "destructive"}>
                         {payment.status}
