@@ -104,20 +104,26 @@ export default function AdminStudentsPage() {
         return;
     }
     try {
-        const studentsQuery = query(collection(db, 'users'), where('role', '==', 'student'), where('managerUid', '==', user.uid));
+        // Query for all users associated with the manager
+        const studentsQuery = query(collection(db, 'users'), where('managerUid', '==', user.uid));
         const querySnapshot = await getDocs(studentsQuery);
-        const fetchedStudents = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                fullName: data.fullName || 'N/A',
-                studentId: data.studentId || 'N/A',
-                email: data.email || 'N/A',
-                roomNumber: data.roomNumber || 'Unassigned',
-                outstandingBalance: data.outstandingBalance || 0,
-                totalFee: data.totalFee || 0,
-            };
-        });
+        
+        // Filter for students client-side
+        const fetchedStudents = querySnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(user => user.role === 'student')
+            .map(data => {
+                return {
+                    id: data.id,
+                    fullName: data.fullName || 'N/A',
+                    studentId: data.studentId || 'N/A',
+                    email: data.email || 'N/A',
+                    roomNumber: data.roomNumber || 'Unassigned',
+                    outstandingBalance: data.outstandingBalance || 0,
+                    totalFee: data.totalFee || 0,
+                };
+            });
+            
         setStudents(fetchedStudents);
     } catch (error: any) {
         console.error("Error fetching students:", error);
@@ -356,5 +362,7 @@ export default function AdminStudentsPage() {
     </Card>
   )
 }
+
+    
 
     
