@@ -19,8 +19,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { db } from '@/lib/firebase';
-import { collection, query, getDocs, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+import { collection, query, getDocs, orderBy, doc, updateDoc, serverTimestamp, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -47,8 +47,17 @@ export default function AdminSupportPage() {
 
   const fetchTickets = async () => {
     setIsLoading(true);
+    const user = auth.currentUser;
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
     try {
-      const q = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
+      const q = query(
+        collection(db, 'tickets'),
+        where('managerUid', '==', user.uid),
+        orderBy('createdAt', 'desc')
+      );
       const querySnapshot = await getDocs(q);
       const fetchedTickets = querySnapshot.docs.map(doc => ({
         id: doc.id,
@@ -65,8 +74,16 @@ export default function AdminSupportPage() {
   };
 
   useEffect(() => {
-    fetchTickets();
-  }, [toast]);
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+        if (user) {
+            fetchTickets();
+        } else {
+            setIsLoading(false);
+        }
+    });
+
+    return () => unsubscribe();
+  }, []);
   
   const handleResponseChange = (ticketId: string, text: string) => {
     setResponseTexts(prev => ({...prev, [ticketId]: text}));
@@ -196,5 +213,3 @@ export default function AdminSupportPage() {
     </Card>
   )
 }
-
-    
