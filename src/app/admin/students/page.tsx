@@ -105,16 +105,17 @@ export default function AdminStudentsPage() {
     }
     try {
         const studentsQuery = query(
-            collection(db, 'users'), 
-            where('role', '==', 'student'),
+            collection(db, 'users'),
             where('managerUid', '==', user.uid)
         );
         const querySnapshot = await getDocs(studentsQuery);
         
-        const fetchedStudents = querySnapshot.docs.map(doc => {
-            const data = doc.data();
+        const fetchedStudents = querySnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(user => user.role === 'student')
+            .map(data => {
             return {
-                id: doc.id,
+                id: data.id,
                 fullName: data.fullName || 'N/A',
                 studentId: data.studentId || 'N/A',
                 email: data.email || 'N/A',
@@ -366,5 +367,3 @@ export default function AdminStudentsPage() {
     </Card>
   )
 }
-
-    
