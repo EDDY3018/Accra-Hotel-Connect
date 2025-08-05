@@ -7,11 +7,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Bell, FileWarning, BedDouble } from "lucide-react";
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, writeBatch, orderBy, limit } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 
-const announcements: any[] = [];
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+}
 
 interface RoomInfo {
   id: string;
@@ -30,67 +35,91 @@ export default function StudentDashboardPage() {
   const [userName, setUserName] = useState('');
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPaying, setIsPaying] = useState(false);
 
-  const fetchUserData = async () => {
-      setIsLoading(true);
-      const user = auth.currentUser;
-      if (user) {
-        try {
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDoc = await getDoc(userDocRef);
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            const fullName = userData.fullName || '';
-            setUserName(fullName.split(' ')[0]);
-
-            if (userData.roomId) {
-              const roomDocRef = doc(db, 'rooms', userData.roomId);
-              const roomDoc = await getDoc(roomDocRef);
-              if (roomDoc.exists()) {
-                const roomData = roomDoc.data();
-                setRoomInfo({
-                  id: roomDoc.id,
-                  roomNumber: roomData.roomNumber || 'N/A',
-                  name: roomData.name || 'Room details not found'
-                });
-              }
-            } else {
-              setRoomInfo(null);
-            }
-            
-            let bookingId = null;
-            if(userData.outstandingBalance > 0 && userData.roomId) {
-              const bookingsQuery = query(collection(db, "bookings"), where("studentUid", "==", user.uid), where("status", "==", "Unpaid"));
-              const querySnapshot = await getDocs(bookingsQuery);
-              if (!querySnapshot.empty) {
-                  bookingId = querySnapshot.docs[0].id;
-              }
-            }
-
-            if (userData.outstandingBalance && userData.outstandingBalance > 0) {
-              setPaymentInfo({
-                balance: userData.outstandingBalance,
-                dueDate: userData.dueDate ? new Date(userData.dueDate).toLocaleDateString() : 'Not specified',
-                bookingId: bookingId,
-              });
-            } else {
-              setPaymentInfo(null);
-            }
-          }
-        } catch (error: any) {
-            console.error("Error fetching user data:", error);
-            toast({ variant: 'destructive', title: 'Error loading dashboard', description: 'Could not fetch your data. See console for details.' });
-        } finally {
-            setIsLoading(false);
-        }
-      } else {
-        setIsLoading(false);
-      }
-    };
-  
   useEffect(() => {
+    const fetchUserData = async () => {
+        setIsLoading(true);
+        const user = auth.currentUser;
+        if (user) {
+          try {
+            const userDocRef = doc(db, 'users', user.uid);
+            const userDoc = await getDoc(userDocRef);
+
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              const fullName = userData.fullName || '';
+              setUserName(fullName.split(' ')[0]);
+
+              if (userData.roomId) {
+                const roomDocRef = doc(db, 'rooms', userData.roomId);
+                const roomDoc = await getDoc(roomDocRef);
+                if (roomDoc.exists()) {
+                  const roomData = roomDoc.data();
+                  setRoomInfo({
+                    id: roomDoc.id,
+                    roomNumber: roomData.roomNumber || 'N/A',
+                    name: roomData.name || 'Room details not found'
+                  });
+                }
+              } else {
+                setRoomInfo(null);
+              }
+              
+              let bookingId = null;
+              if(userData.outstandingBalance > 0 && userData.roomId) {
+                const bookingsQuery = query(collection(db, "bookings"), where("studentUid", "==", user.uid), where("status", "==", "Unpaid"));
+                const querySnapshot = await getDocs(bookingsQuery);
+                if (!querySnapshot.empty) {
+                    bookingId = querySnapshot.docs[0].id;
+                }
+              }
+
+              if (userData.outstandingBalance && userData.outstandingBalance > 0) {
+                setPaymentInfo({
+                  balance: userData.outstandingBalance,
+                  dueDate: userData.dueDate ? new Date(userData.dueDate).toLocaleDateString() : 'Not specified',
+                  bookingId: bookingId,
+                });
+              } else {
+                setPaymentInfo(null);
+              }
+
+              // Fetch announcements from manager
+              if (userData.managerUid) {
+                  const announcementsQuery = query(
+                      collection(db, 'announcements'),
+                      where('managerUid', '==', userData.managerUid),
+                      where('status', '==', 'Published'),
+                      orderBy('createdAt', 'desc'),
+                      limit(5)
+                  );
+                  const announcementsSnapshot = await getDocs(announcementsQuery);
+                  const fetchedAnnouncements = announcementsSnapshot.docs.map(doc => {
+                      const data = doc.data();
+                      return {
+                          id: doc.id,
+                          title: data.title,
+                          content: data.content,
+                          date: data.createdAt?.toDate().toLocaleDateString() ?? 'N/A',
+                      }
+                  });
+                  setAnnouncements(fetchedAnnouncements);
+              }
+            }
+          } catch (error: any) {
+              console.error("Error fetching user data:", error);
+              toast({ variant: 'destructive', title: 'Error loading dashboard', description: 'Could not fetch your data. See console for details.' });
+          } finally {
+              setIsLoading(false);
+          }
+        } else {
+          setIsLoading(false);
+        }
+      };
+
     const unsubscribe = auth.onAuthStateChanged(user => {
         if (user) {
             fetchUserData();
@@ -100,7 +129,7 @@ export default function StudentDashboardPage() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [toast]);
   
   const handlePayNow = async () => {
     if (!paymentInfo || !paymentInfo.bookingId) {
@@ -216,8 +245,13 @@ export default function StudentDashboardPage() {
             <Bell className="w-5 h-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {announcements.length === 0 ? (
+             <div className="space-y-4">
+              {isLoading ? (
+                <>
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </>
+              ) : announcements.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No new announcements.</p>
               ) : (
                 announcements.map((item) => (
@@ -226,7 +260,7 @@ export default function StudentDashboardPage() {
                       <p className="font-semibold">{item.title}</p>
                       <span className="text-xs text-muted-foreground">{item.date}</span>
                     </div>
-                    <p className="text-sm text-muted-foreground">{item.content}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{item.content}</p>
                   </div>
                 ))
               )}
@@ -237,5 +271,3 @@ export default function StudentDashboardPage() {
     </>
   );
 }
-
-    
