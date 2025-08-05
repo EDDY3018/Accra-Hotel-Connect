@@ -1,4 +1,7 @@
 
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from "next/link"
 import Image from "next/image"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -6,9 +9,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search } from "lucide-react"
-import { collection, getDocs, query, where } from "firebase/firestore"
+import { Search, Loader2 } from "lucide-react"
+import { collection, getDocs, query } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Room {
     id: string;
@@ -19,38 +23,45 @@ interface Room {
     amenities: string[];
 }
 
-async function getRooms(): Promise<Room[]> {
-    try {
-        const roomsQuery = query(collection(db, 'rooms'));
-        const roomSnapshot = await getDocs(roomsQuery);
 
-        if (roomSnapshot.empty) {
-            console.log("No rooms found in Firestore.");
-            return [];
+export default function RoomsPage() {
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function getRooms() {
+        setIsLoading(true);
+        try {
+            const roomsQuery = query(collection(db, 'rooms'));
+            const roomSnapshot = await getDocs(roomsQuery);
+
+            if (roomSnapshot.empty) {
+                console.log("No rooms found in Firestore.");
+                setRooms([]);
+                return;
+            }
+
+            const roomList = roomSnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    name: data.name || "Unnamed Room",
+                    price: data.price || 0,
+                    images: data.images && data.images.length > 0 ? data.images : [{ src: "https://placehold.co/600x400.png", hint: "hostel room" }],
+                    status: data.status || "Available",
+                    amenities: data.amenities || [],
+                } as Room;
+            });
+            setRooms(roomList);
+        } catch (error) {
+            console.error("Error fetching rooms:", error);
+            setRooms([]); // Set to empty array on error
+        } finally {
+            setIsLoading(false);
         }
-
-        const roomList = roomSnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                name: data.name || "Unnamed Room",
-                price: data.price || 0,
-                images: data.images && data.images.length > 0 ? data.images : [{ src: "https://placehold.co/600x400.png", hint: "hostel room" }],
-                status: data.status || "Available",
-                amenities: data.amenities || [],
-            } as Room;
-        });
-        
-        return roomList;
-    } catch (error) {
-        console.error("Error fetching rooms:", error);
-        return []; // Return empty array on error
     }
-}
-
-
-export default async function RoomsPage() {
-  const rooms = await getRooms();
+    getRooms();
+  }, []);
 
   return (
     <>
@@ -78,7 +89,23 @@ export default async function RoomsPage() {
                 </Select>
             </div>
         </div>
-         {rooms.length === 0 ? (
+         {isLoading ? (
+             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {[...Array(3)].map((_, i) => (
+                    <Card key={i} className="overflow-hidden flex flex-col">
+                        <Skeleton className="h-48 w-full" />
+                        <CardContent className="pt-6 flex-1 space-y-2">
+                           <Skeleton className="h-6 w-3/4" />
+                           <Skeleton className="h-4 w-full" />
+                        </CardContent>
+                        <CardFooter className="flex justify-between items-center">
+                            <Skeleton className="h-6 w-20" />
+                            <Skeleton className="h-10 w-28" />
+                        </CardFooter>
+                    </Card>
+                ))}
+            </div>
+        ) : rooms.length === 0 ? (
             <div className="text-center py-12">
                 <p className="text-muted-foreground">No rooms available at the moment. Please check back later.</p>
             </div>

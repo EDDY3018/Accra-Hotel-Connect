@@ -115,6 +115,8 @@ export default function StudentDashboardPage() {
                       }
                   });
                   setAnnouncements(fetchedAnnouncements);
+              } else {
+                setAnnouncements([]);
               }
             }
           } catch (error: any) {
