@@ -104,11 +104,10 @@ export default function AdminStudentsPage() {
         return;
     }
     try {
-        // This query now matches the Firestore security rules exactly
         const studentsQuery = query(
             collection(db, 'users'), 
-            where('managerUid', '==', user.uid),
-            where('role', '==', 'student')
+            where('role', '==', 'student'),
+            where('managerUid', '==', user.uid)
         );
         const querySnapshot = await getDocs(studentsQuery);
         
@@ -367,3 +366,5 @@ export default function AdminStudentsPage() {
     </Card>
   )
 }
+
+    
