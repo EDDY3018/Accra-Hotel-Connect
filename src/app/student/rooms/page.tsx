@@ -21,11 +21,12 @@ interface Room {
 
 async function getRooms(): Promise<Room[]> {
     try {
-        const roomsQuery = query(collection(db, 'rooms'), where('status', '==', 'Available'));
+        // Fetch all rooms, filtering will be done client-side.
+        const roomsQuery = query(collection(db, 'rooms'));
         const roomSnapshot = await getDocs(roomsQuery);
 
         if (roomSnapshot.empty) {
-            console.log("No available rooms found in Firestore.");
+            console.log("No rooms found in Firestore.");
             return [];
         }
 
@@ -40,7 +41,9 @@ async function getRooms(): Promise<Room[]> {
                 amenities: data.amenities || [],
             } as Room;
         });
-        return roomList;
+        
+        // Filter for available rooms on the client side
+        return roomList.filter(room => room.status === 'Available');
     } catch (error) {
         console.error("Error fetching rooms:", error);
         return []; // Return empty array on error
