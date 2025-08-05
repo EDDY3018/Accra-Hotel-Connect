@@ -168,8 +168,10 @@ export default function RoomDetailPage() {
             status: 'Unpaid'
         });
 
-        const roomRef = doc(db, 'rooms', roomDetails.id);
-        batch.update(roomRef, { status: 'Occupied' });
+        // The student should not be able to update the room status directly.
+        // This should be handled by the manager.
+        // const roomRef = doc(db, 'rooms', roomDetails.id);
+        // batch.update(roomRef, { status: 'Occupied' });
 
         const userRef = doc(db, 'users', user.uid);
         batch.update(userRef, {
@@ -346,5 +348,3 @@ export default function RoomDetailPage() {
     </div>
   )
 }
-
-    
