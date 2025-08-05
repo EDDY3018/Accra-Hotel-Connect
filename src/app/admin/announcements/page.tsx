@@ -32,13 +32,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, query, where, getDocs, getDoc, doc, orderBy } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, getDoc, doc, orderBy, updateDoc, deleteDoc } from 'firebase/firestore';
 
 const formSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters long."),
@@ -48,6 +58,7 @@ const formSchema = z.object({
 interface Announcement {
     id: string;
     title: string;
+    content: string;
     author: string;
     date: string;
     status: 'Published' | 'Draft';
@@ -57,7 +68,8 @@ export default function AdminAnnouncementsPage() {
   const { toast } = useToast();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -88,8 +100,9 @@ export default function AdminAnnouncementsPage() {
           return {
               id: doc.id,
               title: data.title,
+              content: data.content,
               author: data.author,
-              date: data.createdAt.toDate().toLocaleDateString(),
+              date: data.createdAt?.toDate().toLocaleDateString() ?? new Date().toLocaleDateString(),
               status: data.status,
           }
       });
@@ -112,6 +125,19 @@ export default function AdminAnnouncementsPage() {
     });
     return () => unsubscribe();
   }, []);
+  
+  useEffect(() => {
+    if (isFormOpen && editingAnnouncement) {
+      form.reset({ title: editingAnnouncement.title, content: editingAnnouncement.content });
+    } else {
+      form.reset({ title: '', content: '' });
+    }
+  }, [isFormOpen, editingAnnouncement, form]);
+  
+  const handleOpenDialog = (announcement: Announcement | null = null) => {
+    setEditingAnnouncement(announcement);
+    setIsFormOpen(true);
+  }
 
   const handleFormSubmit = async (values: z.infer<typeof formSchema>, status: 'Published' | 'Draft') => {
     const user = auth.currentUser;
@@ -121,25 +147,35 @@ export default function AdminAnnouncementsPage() {
     }
     
     try {
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        const authorName = userDoc.exists() ? userDoc.data().fullName : "Admin";
+        if (editingAnnouncement) {
+            // Update existing announcement
+            const docRef = doc(db, 'announcements', editingAnnouncement.id);
+            await updateDoc(docRef, {
+                title: values.title,
+                content: values.content,
+                status: status,
+            });
+            toast({ title: `Announcement Updated!`, description: `Your announcement has been updated.`});
+        } else {
+            // Create new announcement
+            const userDocRef = doc(db, 'users', user.uid);
+            const userDoc = await getDoc(userDocRef);
+            const authorName = userDoc.exists() ? userDoc.data().fullName : "Admin";
 
-        await addDoc(collection(db, 'announcements'), {
-            title: values.title,
-            content: values.content,
-            status: status,
-            author: authorName,
-            managerUid: user.uid,
-            createdAt: serverTimestamp(),
-        });
+            await addDoc(collection(db, 'announcements'), {
+                title: values.title,
+                content: values.content,
+                status: status,
+                author: authorName,
+                managerUid: user.uid,
+                createdAt: serverTimestamp(),
+            });
+            toast({ title: `Announcement ${status}!`, description: `Your announcement has been saved as ${status.toLowerCase()}.` });
+        }
 
-        toast({
-            title: `Announcement ${status}!`,
-            description: `Your announcement has been saved as ${status.toLowerCase()}.`,
-        });
         form.reset();
-        setIsDialogOpen(false);
+        setIsFormOpen(false);
+        setEditingAnnouncement(null);
         fetchAnnouncements();
 
     } catch (error: any) {
@@ -147,6 +183,17 @@ export default function AdminAnnouncementsPage() {
         toast({ variant: 'destructive', title: 'Submission Error', description: 'Could not save the announcement. See console for details.' });
     }
   };
+  
+  const handleDeleteAnnouncement = async (announcementId: string) => {
+    try {
+        await deleteDoc(doc(db, "announcements", announcementId));
+        toast({ title: "Announcement Deleted", description: "The announcement has been permanently removed." });
+        fetchAnnouncements();
+    } catch (error) {
+        console.error("Error deleting announcement: ", error);
+        toast({ variant: 'destructive', title: 'Delete Error', description: 'Could not delete the announcement. See console for details.' });
+    }
+  }
 
 
   return (
@@ -157,17 +204,17 @@ export default function AdminAnnouncementsPage() {
                 <CardTitle className="font-headline">Announcements</CardTitle>
                 <CardDescription>Create and manage announcements for students.</CardDescription>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogTrigger asChild>
-                    <Button>
+                    <Button onClick={() => handleOpenDialog()}>
                         <PlusCircle className="mr-2 h-4 w-4" /> New Announcement
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-xl">
                     <DialogHeader>
-                        <DialogTitle>Create Announcement</DialogTitle>
+                        <DialogTitle>{editingAnnouncement ? 'Edit Announcement' : 'Create Announcement'}</DialogTitle>
                         <DialogDescription>
-                            Compose a new announcement to be displayed to all students.
+                            {editingAnnouncement ? 'Update the details of your announcement.' : 'Compose a new announcement to be displayed to all students.'}
                         </DialogDescription>
                     </DialogHeader>
                      <Form {...form}>
@@ -247,12 +294,28 @@ export default function AdminAnnouncementsPage() {
                     </TableCell>
                     <TableCell>
                         <div className="flex gap-2">
-                            <Button variant="outline" size="icon">
+                            <Button variant="outline" size="icon" onClick={() => handleOpenDialog(ann)}>
                                 <Edit className="h-4 w-4" />
                             </Button>
-                             <Button variant="destructive" size="icon">
-                                <Trash className="h-4 w-4" />
-                            </Button>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                     <Button variant="destructive" size="icon">
+                                        <Trash className="h-4 w-4" />
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This action cannot be undone. This will permanently delete the announcement.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteAnnouncement(ann.id)}>Delete</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </div>
                     </TableCell>
                   </TableRow>
@@ -264,5 +327,3 @@ export default function AdminAnnouncementsPage() {
     </Card>
   )
 }
-
-    
