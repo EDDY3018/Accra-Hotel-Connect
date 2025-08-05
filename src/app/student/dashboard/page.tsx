@@ -53,6 +53,7 @@ export default function StudentDashboardPage() {
               const fullName = userData.fullName || '';
               setUserName(fullName.split(' ')[0]);
 
+              // Fetch room details if assigned
               if (userData.roomId) {
                 const roomDocRef = doc(db, 'rooms', userData.roomId);
                 const roomDoc = await getDoc(roomDocRef);
@@ -68,15 +69,22 @@ export default function StudentDashboardPage() {
                 setRoomInfo(null);
               }
               
+              // Find the unpaid booking to get the bookingId for payment
               let bookingId = null;
-              if(userData.outstandingBalance > 0 && userData.roomId) {
-                const bookingsQuery = query(collection(db, "bookings"), where("studentUid", "==", user.uid), where("status", "==", "Unpaid"));
+              if(userData.outstandingBalance > 0) {
+                const bookingsQuery = query(
+                  collection(db, "bookings"), 
+                  where("studentUid", "==", user.uid), 
+                  where("status", "==", "Unpaid"),
+                  limit(1)
+                );
                 const querySnapshot = await getDocs(bookingsQuery);
                 if (!querySnapshot.empty) {
                     bookingId = querySnapshot.docs[0].id;
                 }
               }
 
+              // Set payment info if there is a balance
               if (userData.outstandingBalance && userData.outstandingBalance > 0) {
                 setPaymentInfo({
                   balance: userData.outstandingBalance,
@@ -87,7 +95,7 @@ export default function StudentDashboardPage() {
                 setPaymentInfo(null);
               }
 
-              // Fetch announcements from manager
+              // Fetch announcements from the student's manager
               if (userData.managerUid) {
                   const announcementsQuery = query(
                       collection(db, 'announcements'),
@@ -163,7 +171,7 @@ export default function StudentDashboardPage() {
       await batch.commit();
 
       toast({ title: 'Payment Successful!', description: 'Your payment has been recorded.' });
-      fetchUserData(); // Refresh data
+      setPaymentInfo(null); // Clear payment info after successful payment
     } catch (error: any) {
       console.error("Payment simulation failed:", error);
       toast({ variant: 'destructive', title: 'Payment Failed', description: 'Could not process payment. See console for details.' });
