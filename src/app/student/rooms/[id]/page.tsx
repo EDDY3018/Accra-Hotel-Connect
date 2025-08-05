@@ -44,10 +44,12 @@ import {
   Building,
   MapPin,
   Phone,
+  AlertCircle,
 } from 'lucide-react';
 import { doc, getDoc, writeBatch } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const amenitiesMap: { [key: string]: { icon: React.ElementType; text: string } } = {
   wifi: { icon: Wifi, text: 'High-speed Wi-Fi' },
@@ -85,6 +87,7 @@ export default function RoomDetailPage() {
   const { toast } = useToast();
   const [roomDetails, setRoomDetails] = useState<RoomDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEligibleToBook, setIsEligibleToBook] = useState(true);
 
   const form = useForm<z.infer<typeof bookingFormSchema>>({
     resolver: zodResolver(bookingFormSchema),
@@ -127,6 +130,12 @@ export default function RoomDetailPage() {
             fullName: userData.fullName || '',
             email: user.email || '',
           });
+          
+          if (userData.roomId && userData.outstandingBalance > 0) {
+              setIsEligibleToBook(false);
+          } else {
+              setIsEligibleToBook(true);
+          }
         }
       }
       getRoomDetails().finally(() => setIsLoading(false));
@@ -167,11 +176,6 @@ export default function RoomDetailPage() {
             bookingDate: new Date().toISOString(),
             status: 'Unpaid'
         });
-
-        // The student should not be able to update the room status directly.
-        // This should be handled by the manager.
-        // const roomRef = doc(db, 'rooms', roomDetails.id);
-        // batch.update(roomRef, { status: 'Occupied' });
 
         const userRef = doc(db, 'users', user.uid);
         batch.update(userRef, {
@@ -307,41 +311,51 @@ export default function RoomDetailPage() {
                 <p className="font-semibold text-3xl pt-4">GHS {roomDetails.price.toFixed(2)}<span className="text-lg font-normal text-muted-foreground">/year</span></p>
             </CardHeader>
             <CardContent>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="fullName"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Full Name</FormLabel>
-                                    <FormControl>
-                                        <Input {...field} readOnly disabled />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                         <FormField
-                            control={form.control}
-                            name="email"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Email Address</FormLabel>
-                                    <FormControl>
-                                        <Input type="email" {...field} readOnly disabled />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <Button type="submit" size="lg" className="w-full text-lg" disabled={isSubmitting || roomDetails.status !== 'Available'}>
-                            <CheckCircle2 className="mr-2 h-5 w-5"/>
-                            {isSubmitting ? 'Booking...' : roomDetails.status === 'Available' ? 'Book Now' : 'Occupied'}
-                        </Button>
-                        <p className="text-xs text-center text-muted-foreground">By booking, you agree to the terms and conditions.</p>
-                    </form>
-                </Form>
+                {!isEligibleToBook ? (
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Booking Not Allowed</AlertTitle>
+                        <AlertDescription>
+                            You already have an active booking with an outstanding balance. Please clear your balance before booking a new room.
+                        </AlertDescription>
+                    </Alert>
+                ) : (
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                            <FormField
+                                control={form.control}
+                                name="fullName"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Full Name</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} readOnly disabled />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="email"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Email Address</FormLabel>
+                                        <FormControl>
+                                            <Input type="email" {...field} readOnly disabled />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <Button type="submit" size="lg" className="w-full text-lg" disabled={isSubmitting || roomDetails.status !== 'Available' || !isEligibleToBook}>
+                                <CheckCircle2 className="mr-2 h-5 w-5"/>
+                                {isSubmitting ? 'Booking...' : roomDetails.status === 'Available' ? 'Book Now' : 'Occupied'}
+                            </Button>
+                            <p className="text-xs text-center text-muted-foreground">By booking, you agree to the terms and conditions.</p>
+                        </form>
+                    </Form>
+                )}
             </CardContent>
         </Card>
       </div>
