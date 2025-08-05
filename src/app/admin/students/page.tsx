@@ -104,30 +104,35 @@ export default function AdminStudentsPage() {
         return;
     }
     try {
-        // Query for all users associated with the manager
-        const studentsQuery = query(collection(db, 'users'), where('managerUid', '==', user.uid));
+        // This query now matches the Firestore security rules exactly
+        const studentsQuery = query(
+            collection(db, 'users'), 
+            where('managerUid', '==', user.uid),
+            where('role', '==', 'student')
+        );
         const querySnapshot = await getDocs(studentsQuery);
         
-        // Filter for students client-side
-        const fetchedStudents = querySnapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter(user => user.role === 'student')
-            .map(data => {
-                return {
-                    id: data.id,
-                    fullName: data.fullName || 'N/A',
-                    studentId: data.studentId || 'N/A',
-                    email: data.email || 'N/A',
-                    roomNumber: data.roomNumber || 'Unassigned',
-                    outstandingBalance: data.outstandingBalance || 0,
-                    totalFee: data.totalFee || 0,
-                };
-            });
+        const fetchedStudents = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                fullName: data.fullName || 'N/A',
+                studentId: data.studentId || 'N/A',
+                email: data.email || 'N/A',
+                roomNumber: data.roomNumber || 'Unassigned',
+                outstandingBalance: data.outstandingBalance || 0,
+                totalFee: data.totalFee || 0,
+            };
+        });
             
         setStudents(fetchedStudents);
     } catch (error: any) {
         console.error("Error fetching students:", error);
-        toast({ variant: 'destructive', title: 'Error fetching students', description: 'Could not fetch students. Check console for details.' });
+        toast({ 
+            variant: 'destructive', 
+            title: 'Error Fetching students', 
+            description: 'Could not fetch students. Check console for logs' 
+        });
     } finally {
         setIsLoading(false);
     }
@@ -362,7 +367,3 @@ export default function AdminStudentsPage() {
     </Card>
   )
 }
-
-    
-
-    
