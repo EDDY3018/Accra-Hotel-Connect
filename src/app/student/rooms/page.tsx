@@ -21,7 +21,6 @@ interface Room {
 
 async function getRooms(): Promise<Room[]> {
     try {
-        // Fetch all rooms, filtering will be done client-side.
         const roomsQuery = query(collection(db, 'rooms'));
         const roomSnapshot = await getDocs(roomsQuery);
 
@@ -42,8 +41,7 @@ async function getRooms(): Promise<Room[]> {
             } as Room;
         });
         
-        // Filter for available rooms on the client side
-        return roomList.filter(room => room.status === 'Available');
+        return roomList;
     } catch (error) {
         console.error("Error fetching rooms:", error);
         return []; // Return empty array on error
