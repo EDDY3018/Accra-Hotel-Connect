@@ -1,3 +1,10 @@
+
+'use client';
+
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import {
   Table,
   TableBody,
@@ -15,7 +22,7 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Edit, PlusCircle, Trash } from "lucide-react"
+import { Edit, PlusCircle, Trash, Loader2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -28,10 +35,120 @@ import {
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { auth, db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp, query, where, getDocs, getDoc, doc, orderBy } from 'firebase/firestore';
 
-const announcements: any[] = [];
+const formSchema = z.object({
+  title: z.string().min(5, "Title must be at least 5 characters long."),
+  content: z.string().min(10, "Content must be at least 10 characters long."),
+});
+
+interface Announcement {
+    id: string;
+    title: string;
+    author: string;
+    date: string;
+    status: 'Published' | 'Draft';
+}
 
 export default function AdminAnnouncementsPage() {
+  const { toast } = useToast();
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      title: "",
+      content: "",
+    },
+  });
+
+  const { isSubmitting } = form.formState;
+
+  const fetchAnnouncements = async () => {
+    setIsLoading(true);
+    const user = auth.currentUser;
+    if (!user) {
+        setIsLoading(false);
+        return;
+    }
+    try {
+      const q = query(
+        collection(db, 'announcements'),
+        where('managerUid', '==', user.uid),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const fetchedAnnouncements = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+              id: doc.id,
+              title: data.title,
+              author: data.author,
+              date: data.createdAt.toDate().toLocaleDateString(),
+              status: data.status,
+          }
+      });
+      setAnnouncements(fetchedAnnouncements);
+    } catch (error: any) {
+        console.error("Error fetching announcements: ", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch announcements. See console for details.' });
+    } finally {
+        setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
+        if(user) {
+            fetchAnnouncements();
+        } else {
+            setIsLoading(false);
+        }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleFormSubmit = async (values: z.infer<typeof formSchema>, status: 'Published' | 'Draft') => {
+    const user = auth.currentUser;
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be logged in.' });
+        return;
+    }
+    
+    try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        const authorName = userDoc.exists() ? userDoc.data().fullName : "Admin";
+
+        await addDoc(collection(db, 'announcements'), {
+            title: values.title,
+            content: values.content,
+            status: status,
+            author: authorName,
+            managerUid: user.uid,
+            createdAt: serverTimestamp(),
+        });
+
+        toast({
+            title: `Announcement ${status}!`,
+            description: `Your announcement has been saved as ${status.toLowerCase()}.`,
+        });
+        form.reset();
+        setIsDialogOpen(false);
+        fetchAnnouncements();
+
+    } catch (error: any) {
+        console.error("Error submitting announcement: ", error);
+        toast({ variant: 'destructive', title: 'Submission Error', description: 'Could not save the announcement. See console for details.' });
+    }
+  };
+
+
   return (
     <Card>
       <CardHeader>
@@ -40,7 +157,7 @@ export default function AdminAnnouncementsPage() {
                 <CardTitle className="font-headline">Announcements</CardTitle>
                 <CardDescription>Create and manage announcements for students.</CardDescription>
             </div>
-            <Dialog>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                     <Button>
                         <PlusCircle className="mr-2 h-4 w-4" /> New Announcement
@@ -48,24 +165,48 @@ export default function AdminAnnouncementsPage() {
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-xl">
                     <DialogHeader>
-                    <DialogTitle>Create Announcement</DialogTitle>
-                    <DialogDescription>
-                        Compose a new announcement to be displayed to all students.
-                    </DialogDescription>
+                        <DialogTitle>Create Announcement</DialogTitle>
+                        <DialogDescription>
+                            Compose a new announcement to be displayed to all students.
+                        </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="ann-title" className="text-right">Title</Label>
-                            <Input id="ann-title" placeholder="Announcement Title" className="col-span-3" />
-                        </div>
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label htmlFor="ann-content" className="text-right pt-2">Content</Label>
-                             <Textarea id="ann-content" className="col-span-3" rows={6} placeholder="Type your announcement here."/>
-                        </div>
-                    </div>
+                     <Form {...form}>
+                        <form id="announcement-form" onSubmit={(e) => e.preventDefault()} className="grid gap-4 py-4">
+                            <FormField
+                                control={form.control}
+                                name="title"
+                                render={({ field }) => (
+                                    <FormItem className="grid grid-cols-4 items-center gap-4">
+                                        <FormLabel className="text-right">Title</FormLabel>
+                                        <FormControl className="col-span-3">
+                                            <Input placeholder="Announcement Title" {...field} />
+                                        </FormControl>
+                                        <FormMessage className="col-span-4 pl-[25%]" />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={form.control}
+                                name="content"
+                                render={({ field }) => (
+                                    <FormItem className="grid grid-cols-4 items-start gap-4">
+                                        <FormLabel className="text-right pt-2">Content</FormLabel>
+                                        <FormControl className="col-span-3">
+                                             <Textarea rows={6} placeholder="Type your announcement here." {...field}/>
+                                        </FormControl>
+                                        <FormMessage className="col-span-4 pl-[25%]" />
+                                    </FormItem>
+                                )}
+                            />
+                        </form>
+                    </Form>
                     <DialogFooter>
-                        <Button variant="outline">Save as Draft</Button>
-                        <Button type="submit">Publish</Button>
+                        <Button variant="outline" onClick={form.handleSubmit((values) => handleFormSubmit(values, 'Draft'))} disabled={isSubmitting}>
+                           {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save as Draft
+                        </Button>
+                        <Button type="submit" onClick={form.handleSubmit((values) => handleFormSubmit(values, 'Published'))} disabled={isSubmitting}>
+                           {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Publish
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -83,7 +224,13 @@ export default function AdminAnnouncementsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {announcements.length === 0 ? (
+            {isLoading ? (
+                <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10">
+                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+                    </TableCell>
+                </TableRow>
+            ) : announcements.length === 0 ? (
                 <TableRow>
                     <TableCell colSpan={5} className="text-center">No announcements found.</TableCell>
                 </TableRow>
@@ -117,3 +264,5 @@ export default function AdminAnnouncementsPage() {
     </Card>
   )
 }
+
+    
