@@ -44,6 +44,7 @@ import {
   Building,
   MapPin,
   Phone,
+  AlertCircle,
 } from 'lucide-react';
 import { doc, getDoc, writeBatch } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
@@ -85,6 +86,7 @@ export default function RoomDetailPage() {
   const { toast } = useToast();
   const [roomDetails, setRoomDetails] = useState<RoomDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasActiveBooking, setHasActiveBooking] = useState(false);
 
   const form = useForm<z.infer<typeof bookingFormSchema>>({
     resolver: zodResolver(bookingFormSchema),
@@ -127,6 +129,10 @@ export default function RoomDetailPage() {
             fullName: userData.fullName || '',
             email: user.email || '',
           });
+          // Check if user already has a room
+          if (userData.roomId) {
+            setHasActiveBooking(true);
+          }
         }
       }
       getRoomDetails().finally(() => setIsLoading(false));
@@ -149,6 +155,10 @@ export default function RoomDetailPage() {
     }
     if (roomDetails.status !== 'Available') {
         toast({ variant: 'destructive', title: 'Room Not Available', description: 'This room has already been booked.' });
+        return;
+    }
+     if (hasActiveBooking) {
+        toast({ variant: 'destructive', title: 'Active Booking Found', description: 'You already have an active booking and cannot book another room.' });
         return;
     }
 
@@ -177,11 +187,6 @@ export default function RoomDetailPage() {
             managerUid: roomDetails.managerUid
         });
         
-        // This is not secure. A student should not be able to update any room.
-        // The manager should confirm payment and then set the room to occupied.
-        // const roomRef = doc(db, 'rooms', roomDetails.id);
-        // batch.update(roomRef, { status: 'Occupied' });
-
         await batch.commit();
 
         toast({ title: 'Booking Successful!', description: "Your room has been secured. Redirecting to dashboard..." });
@@ -237,6 +242,7 @@ export default function RoomDetailPage() {
   }
 
   const roomAmenities = roomDetails.amenities?.map((key: string) => amenitiesMap[key]).filter(Boolean) || [];
+  const isBookable = !isSubmitting && roomDetails.status === 'Available' && !hasActiveBooking;
 
   return (
     <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
@@ -307,6 +313,15 @@ export default function RoomDetailPage() {
                 <p className="font-semibold text-3xl pt-4">GHS {roomDetails.price.toFixed(2)}<span className="text-lg font-normal text-muted-foreground">/year</span></p>
             </CardHeader>
             <CardContent>
+                {hasActiveBooking && (
+                    <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-md mb-4">
+                       <AlertCircle className="w-5 h-5 mt-0.5 text-yellow-600"/>
+                       <div className="flex-1">
+                          <h4 className="font-semibold">You have an active booking</h4>
+                          <p className="text-xs">You must complete payment for your current room before booking another.</p>
+                       </div>
+                    </div>
+                )}
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                         <FormField
@@ -335,9 +350,9 @@ export default function RoomDetailPage() {
                                 </FormItem>
                             )}
                         />
-                        <Button type="submit" size="lg" className="w-full text-lg" disabled={isSubmitting || roomDetails.status !== 'Available'}>
+                        <Button type="submit" size="lg" className="w-full text-lg" disabled={!isBookable}>
                             <CheckCircle2 className="mr-2 h-5 w-5"/>
-                            {isSubmitting ? 'Booking...' : roomDetails.status === 'Available' ? 'Book Now' : 'Occupied'}
+                            {isSubmitting ? 'Booking...' : !isBookable && roomDetails.status !== 'Available' ? 'Occupied' : 'Book Now'}
                         </Button>
                         <p className="text-xs text-center text-muted-foreground">By booking, you agree to the terms and conditions.</p>
                     </form>

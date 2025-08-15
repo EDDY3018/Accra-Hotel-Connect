@@ -57,6 +57,14 @@ export default function StudentDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
+  const onPaymentModalClose = () => {
+    setIsPaymentModalOpen(false);
+    toast({
+        title: "Payment Pending",
+        description: "Your booking is awaiting payment confirmation from the hostel manager.",
+    });
+  }
+
   useEffect(() => {
     const fetchUserData = async () => {
         setIsLoading(true);
@@ -231,7 +239,7 @@ export default function StudentDashboardPage() {
                {!isLoading && paymentInfo && paymentInfo.balance > 0 && (
                   <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
                     <DialogTrigger asChild>
-                      <Button size="sm" className="mt-auto w-fit">Pay Now</Button>
+                      <Button size="sm" className="mt-auto w-fit">View Payment Instructions</Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
@@ -272,7 +280,7 @@ export default function StudentDashboardPage() {
                          </div>
                       </div>
                       <DialogFooter>
-                        <Button onClick={() => setIsPaymentModalOpen(false)}>Understood, Close</Button>
+                        <Button onClick={onPaymentModalClose}>Understood, Close</Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>

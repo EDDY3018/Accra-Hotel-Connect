@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Search, Loader2 } from "lucide-react"
 import { auth, db } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy, doc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -111,10 +111,13 @@ export default function AdminBookingsPage() {
         studentUid: booking.studentUid,
         bookingId: booking.id,
         amount: booking.price,
-        paymentDate: new Date().toISOString(),
+        paymentDate: serverTimestamp(),
         status: 'Paid',
         paymentMethod: 'Confirmed by Admin'
       });
+      
+      const roomRef = doc(db, 'rooms', booking.id.split('_')[1]);
+      batch.update(roomRef, { status: 'Occupied' });
 
       await batch.commit();
       toast({
@@ -206,7 +209,7 @@ export default function AdminBookingsPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Confirm Payment</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to mark this booking as paid? This will clear the student's outstanding balance. This action cannot be undone.
+                                Are you sure you want to mark this booking as paid? This will clear the student's outstanding balance and mark the room as occupied. This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
