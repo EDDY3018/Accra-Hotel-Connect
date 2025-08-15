@@ -5,11 +5,22 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bell, FileWarning, BedDouble } from "lucide-react";
+import { Bell, FileWarning, BedDouble, Building, MapPin, Phone, Handshake } from "lucide-react";
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, writeBatch, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 interface Announcement {
   id: string;
@@ -24,10 +35,17 @@ interface RoomInfo {
   name: string;
 }
 
+interface ManagerInfo {
+    hostelName: string;
+    location: string;
+    phone: string;
+}
+
 interface PaymentInfo {
   balance: number;
   dueDate: string;
   bookingId: string | null;
+  managerInfo: ManagerInfo | null;
 }
 
 export default function StudentDashboardPage() {
@@ -37,7 +55,7 @@ export default function StudentDashboardPage() {
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isPaying, setIsPaying] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -53,7 +71,6 @@ export default function StudentDashboardPage() {
               const fullName = userData.fullName || '';
               setUserName(fullName.split(' ')[0]);
 
-              // Fetch room details if assigned
               if (userData.roomId) {
                 const roomDocRef = doc(db, 'rooms', userData.roomId);
                 const roomDoc = await getDoc(roomDocRef);
@@ -69,8 +86,8 @@ export default function StudentDashboardPage() {
                 setRoomInfo(null);
               }
               
-              // Find the unpaid booking to get the bookingId for payment
               let bookingId = null;
+              let managerInfo: ManagerInfo | null = null;
               if(userData.outstandingBalance > 0) {
                 const bookingsQuery = query(
                   collection(db, "bookings"), 
@@ -80,22 +97,32 @@ export default function StudentDashboardPage() {
                 );
                 const querySnapshot = await getDocs(bookingsQuery);
                 if (!querySnapshot.empty) {
+                    const bookingData = querySnapshot.docs[0].data();
                     bookingId = querySnapshot.docs[0].id;
+                    const managerDocRef = doc(db, 'users', bookingData.managerUid);
+                    const managerDoc = await getDoc(managerDocRef);
+                    if (managerDoc.exists()) {
+                        const managerData = managerDoc.data();
+                        managerInfo = {
+                            hostelName: managerData.hostelName,
+                            location: managerData.location,
+                            phone: managerData.phone
+                        };
+                    }
                 }
               }
 
-              // Set payment info if there is a balance
               if (userData.outstandingBalance && userData.outstandingBalance > 0) {
                 setPaymentInfo({
                   balance: userData.outstandingBalance,
                   dueDate: userData.dueDate ? new Date(userData.dueDate).toLocaleDateString() : 'Not specified',
                   bookingId: bookingId,
+                  managerInfo: managerInfo,
                 });
               } else {
                 setPaymentInfo(null);
               }
 
-              // Fetch announcements from the student's manager
               if (userData.managerUid) {
                   const announcementsQuery = query(
                       collection(db, 'announcements'),
@@ -141,46 +168,6 @@ export default function StudentDashboardPage() {
     return () => unsubscribe();
   }, [toast]);
   
-  const handlePayNow = async () => {
-    if (!paymentInfo || !paymentInfo.bookingId) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No active booking found to pay for.' });
-      return;
-    }
-    setIsPaying(true);
-    
-    try {
-      const user = auth.currentUser;
-      if (!user) throw new Error("User not authenticated");
-      
-      const batch = writeBatch(db);
-
-      const userRef = doc(db, 'users', user.uid);
-      batch.update(userRef, { outstandingBalance: 0 });
-
-      const bookingRef = doc(db, 'bookings', paymentInfo.bookingId);
-      batch.update(bookingRef, { status: 'Paid' });
-
-      const paymentRef = doc(collection(db, 'payments'));
-      batch.set(paymentRef, {
-          studentUid: user.uid,
-          bookingId: paymentInfo.bookingId,
-          amount: paymentInfo.balance,
-          paymentDate: new Date().toISOString(),
-          paymentMethod: 'Simulated Gateway',
-          status: 'Paid'
-      });
-      
-      await batch.commit();
-
-      toast({ title: 'Payment Successful!', description: 'Your payment has been recorded.' });
-      setPaymentInfo(null); // Clear payment info after successful payment
-    } catch (error: any) {
-      console.error("Payment simulation failed:", error);
-      toast({ variant: 'destructive', title: 'Payment Failed', description: 'Could not process payment. See console for details.' });
-    } finally {
-      setIsPaying(false);
-    }
-  };
 
   return (
     <>
@@ -242,9 +229,53 @@ export default function StudentDashboardPage() {
                 )}
               </div>
                {!isLoading && paymentInfo && paymentInfo.balance > 0 && (
-                  <Button size="sm" className="mt-auto w-fit" onClick={handlePayNow} disabled={isPaying}>
-                    {isPaying ? 'Processing...' : 'Pay Now'}
-                  </Button>
+                  <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="mt-auto w-fit">Pay Now</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle className="font-headline">Payment Instructions</DialogTitle>
+                        <DialogDescription>
+                          Please use the details below to complete your payment. The admin will confirm it shortly after.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="p-4 rounded-lg border bg-card text-card-foreground">
+                            <h4 className="font-semibold mb-2">Hostel Information</h4>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex items-center gap-3"><Building className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.hostelName || 'N/A'}</span></div>
+                                <div className="flex items-center gap-3"><MapPin className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.location || 'N/A'}</span></div>
+                                <div className="flex items-center gap-3"><Phone className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.phone || 'N/A'}</span></div>
+                            </div>
+                        </div>
+                        <div>
+                            <Label className="font-semibold">Choose Payment Method:</Label>
+                            <RadioGroup defaultValue="momo" className="mt-2 grid grid-cols-2 gap-4">
+                                <div>
+                                    <RadioGroupItem value="momo" id="momo" className="peer sr-only" />
+                                    <Label htmlFor="momo" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                        Momo
+                                    </Label>
+                                </div>
+                                 <div>
+                                    <RadioGroupItem value="cash" id="cash" className="peer sr-only" />
+                                    <Label htmlFor="cash" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                        Cash
+                                    </Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+                         <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-md">
+                           <Handshake className="w-8 h-8 mt-1 text-yellow-600"/>
+                           <p className="text-xs">After paying via your selected method, please ensure you receive a confirmation from the hostel manager. Your dashboard will update to "Paid" once the manager confirms the transaction.</p>
+                         </div>
+                      </div>
+                      <DialogFooter>
+                        <Button onClick={() => setIsPaymentModalOpen(false)}>Understood, Close</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                )}
             </div>
           </CardContent>
