@@ -181,12 +181,14 @@ export default function AdminRoomsPage() {
         maxWidthOrHeight: 1920,
         useWebWorker: true,
       };
-      const compressedImagePromises = values.images.map(file => imageCompression(file, compressionOptions));
-      const compressedImages = await Promise.all(compressedImagePromises);
-      
-      const uploadPromises = compressedImages.map(async (file, i) => {
-          const fileRef = storageRef(storage, `rooms/${user.uid}/${values.roomNumber}/${file.name}_${Date.now()}`);
-          const snapshot = await uploadBytes(fileRef, file);
+
+      const uploadPromises = values.images.map(async (file, i) => {
+          const compressedFile = await imageCompression(file, compressionOptions);
+          const fileRef = storageRef(storage, `rooms/${user.uid}/${values.roomNumber}/${compressedFile.name}_${Date.now()}`);
+          
+          const metadata = { contentType: file.type };
+          const snapshot = await uploadBytes(fileRef, compressedFile, metadata);
+
           const url = await getDownloadURL(snapshot.ref);
           return {
               src: url,
@@ -401,5 +403,3 @@ export default function AdminRoomsPage() {
     </>
   )
 }
-
-    
