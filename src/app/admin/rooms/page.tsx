@@ -60,6 +60,56 @@ const formSchema = z.object({
     .refine((files) => files.every(file => file.size <= 5 * 1024 * 1024), `Each image must be less than 5MB.`),
 });
 
+const clean = (s: string) => s.normalize("NFKD").replace(/[^A-Za-z0-9._-]+/g, "_").trim();
+const imageHints = ["room angle one", "room angle two", "room angle three", "bathroom"];
+
+async function compress(file: File) {
+  if (file.size < 700_000) return file; // skip if already small
+  return imageCompression(file, {
+    maxWidthOrHeight: 1280,
+    maxSizeMB: 0.35,
+    initialQuality: 0.7,
+    useWebWorker: true,
+  });
+}
+
+async function uploadOne(file: File, i: number, roomNumber: string, uid: string, onProgress?: (p:number)=>void) {
+  const t0 = performance.now();
+  const compressed = await compress(file);
+  const ext = (compressed.type?.includes("png")) ? "png" : (compressed.type?.includes("webp") ? "webp" : "jpg");
+  const filename = clean(`${i + 1}_${Date.now()}.${ext}`);
+  const path = `rooms/${uid}/${clean(roomNumber)}/${filename}`;
+  const ref = sRef(storage, path);
+  const metadata = { contentType: compressed.type || file.type || "image/jpeg" };
+
+  const task = uploadBytesResumable(ref, compressed, metadata);
+  await new Promise<void>((resolve, reject) => {
+    task.on("state_changed",
+      snap => onProgress?.(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+      reject,
+      () => resolve()
+    );
+  });
+  const url = await getDownloadURL(task.snapshot.ref);
+  console.log(`img ${i+1}: ${(performance.now()-t0).toFixed(0)}ms`);
+  return { src: url, hint: imageHints[i] || "room interior" };
+}
+
+async function uploadAll(files: File[], roomNumber: string, uid: string, onEachProgress?: (i:number,p:number)=>void) {
+  const queue = files.map((f,i) => [i,f] as const);
+  const results: Array<{src:string; hint:string}> = new Array(queue.length);
+
+  async function worker() {
+    while (queue.length) {
+      const [i, file] = queue.shift()!;
+      results[i] = await uploadOne(file, i, roomNumber, uid, p => onEachProgress?.(i, p));
+    }
+  }
+  await Promise.all([worker(), worker()]); // 2 workers
+  return results;
+}
+
+
 export default function AdminRoomsPage() {
   const { toast } = useToast();
   const [isFormVisible, setIsFormVisible] = useState(false);
@@ -173,36 +223,9 @@ export default function AdminRoomsPage() {
     }
 
     try {
-      const clean = (s: string) => s.replace(/[#[\].?*\\n\r]+/g, '_').trim();
-      const imageHints = ["room angle one", "room angle two", "room angle three", "bathroom"];
-
-      const uploadPromises = values.images.map(async (file, i) => {
-        // 1) compress
-        const compressed = await imageCompression(file, {
-          maxSizeMB: 0.5,
-          maxWidthOrHeight: 1920,
-          useWebWorker: true,
-        });
-
-        // 2) safe path + content type
-        const ext = (compressed.type?.includes('png')) ? 'png' : 'jpg';
-        const filename = clean(`${i + 1}_${Date.now()}.${ext}`);
-        const path = `rooms/${user.uid}/${clean(values.roomNumber)}/${filename}`;
-        const ref = sRef(storage, path);
-
-        const metadata = { contentType: compressed.type || file.type || 'image/jpeg' };
-
-        // 3) upload (resumable)
-        const task = uploadBytesResumable(ref, compressed, metadata);
-        await new Promise<void>((resolve, reject) => {
-          task.on('state_changed', undefined, reject, () => resolve());
-        });
-
-        const url = await getDownloadURL(task.snapshot.ref);
-        return { src: url, hint: imageHints[i] || "room interior" };
+      const imageUrls = await uploadAll(values.images, values.roomNumber, user.uid, (i, p) => {
+        // TODO: update UI progress per image i with percent p
       });
-
-      const imageUrls = await Promise.all(uploadPromises);
 
       const roomData = {
         managerUid: user.uid,
