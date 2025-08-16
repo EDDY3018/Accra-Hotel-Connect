@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image';
 import { auth, db, storage } from '@/lib/firebase';
-import { ref as storageRef, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { ref as sRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -173,7 +173,7 @@ export default function AdminRoomsPage() {
     }
 
     try {
-      const clean = (s: string) => s.replace(/[#[\].?*\\n\r]+/g, '_').trim();
+      const clean = (s: string) => s.replace(/[#[\\]?*\\n\\r]+/g, '_').trim();
       const imageHints = ["room angle one", "room angle two", "room angle three", "bathroom"];
 
       const uploadPromises = values.images.map(async (file, i) => {
@@ -186,9 +186,9 @@ export default function AdminRoomsPage() {
 
         // 2) safe path + content type
         const ext = (compressed.type?.includes('png')) ? 'png' : 'jpg';
-        const filename = `${i + 1}_${Date.now()}.${ext}`;
-        const path = `rooms/${user.uid}/${clean(values.roomNumber)}/${clean(filename)}`;
-        const ref = storageRef(storage, path);
+        const filename = clean(`${i + 1}_${Date.now()}.${ext}`);
+        const path = `rooms/${user.uid}/${clean(values.roomNumber)}/${filename}`;
+        const ref = sRef(storage, path);
 
         const metadata = { contentType: compressed.type || file.type || 'image/jpeg' };
 
@@ -228,11 +228,10 @@ export default function AdminRoomsPage() {
       setIsFormVisible(false);
       fetchManagerAndRooms();
     } catch (error: any) {
-      console.error("Error adding room:", {
+      console.error("UPLOAD FAIL ->", {
         code: error?.code,
         message: error?.message,
-        name: error?.name,
-        serverResponse: error?.customData?.serverResponse, // <-- real server reason
+        serverResponse: error?.customData?.serverResponse, // shows the real reason
       });
       let description = 'Could not save the room. Please check the console for more details.';
       if (error?.code?.includes('permission') || /denied/i.test(error?.message || '')) {
