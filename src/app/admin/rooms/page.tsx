@@ -173,7 +173,7 @@ export default function AdminRoomsPage() {
     }
 
     try {
-      const clean = (s: string) => s.replace(/[#[\\]?*\\n\\r]+/g, '_').trim();
+      const clean = (s: string) => s.replace(/[#[\].?*\\n\r]+/g, '_').trim();
       const imageHints = ["room angle one", "room angle two", "room angle three", "bathroom"];
 
       const uploadPromises = values.images.map(async (file, i) => {
