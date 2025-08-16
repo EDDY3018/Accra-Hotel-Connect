@@ -38,6 +38,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import imageCompression from 'browser-image-compression';
+import { Progress } from '@/components/ui/progress';
 
 
 const amenitiesList = [
@@ -118,6 +119,7 @@ export default function AdminRoomsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadProgresses, setUploadProgresses] = useState<number[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -185,6 +187,7 @@ export default function AdminRoomsPage() {
       
       const newPreviews = limitedFiles.map(file => URL.createObjectURL(file));
       setImagePreviews(newPreviews);
+      setUploadProgresses(new Array(limitedFiles.length).fill(0));
       
       if (event.target) {
         event.target.value = "";
@@ -224,7 +227,11 @@ export default function AdminRoomsPage() {
 
     try {
       const imageUrls = await uploadAll(values.images, values.roomNumber, user.uid, (i, p) => {
-        // TODO: update UI progress per image i with percent p
+        setUploadProgresses(prev => {
+          const newProgresses = [...prev];
+          newProgresses[i] = p;
+          return newProgresses;
+        });
       });
 
       const roomData = {
@@ -248,6 +255,7 @@ export default function AdminRoomsPage() {
       toast({ title: 'Room Added!', description: 'The new room has been saved successfully.' });
       form.reset();
       setImagePreviews([]);
+      setUploadProgresses([]);
       setIsFormVisible(false);
       fetchManagerAndRooms();
     } catch (error: any) {
@@ -339,38 +347,45 @@ export default function AdminRoomsPage() {
                             <FormControl>
                             <div>
                                 {imagePreviews.length > 0 && (
-                                <div className="grid grid-cols-4 gap-2 mb-4">
+                                <div className="grid grid-cols-4 gap-4 mb-4">
                                     {imagePreviews.map((src, index) => (
-                                    <div key={src} className="relative aspect-square">
+                                    <div key={src} className="relative aspect-video space-y-2">
                                         <Image src={src} alt={`Preview ${index + 1}`} fill className="object-cover rounded-md" />
                                         <Button
-                                        type="button"
-                                        variant="destructive"
-                                        size="icon"
-                                        className="absolute top-1 right-1 h-6 w-6 rounded-full"
-                                        onClick={() => handleRemoveImage(index)}
+                                            type="button"
+                                            variant="destructive"
+                                            size="icon"
+                                            className="absolute top-1 right-1 h-6 w-6 rounded-full z-10"
+                                            onClick={() => handleRemoveImage(index)}
+                                            disabled={isSubmitting}
                                         >
-                                        <X className="h-4 w-4" />
+                                            <X className="h-4 w-4" />
                                         </Button>
+                                        {isSubmitting && (
+                                            <div className="absolute bottom-0 left-0 right-0 p-1">
+                                                <Progress value={uploadProgresses[index] || 0} className="w-full h-2" />
+                                            </div>
+                                        )}
                                     </div>
                                     ))}
                                 </div>
                                 )}
                                 <div className="flex items-center justify-center w-full">
-                                <label htmlFor="room-images-input" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted">
+                                <label htmlFor="room-images-input" className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg ${isSubmitting ? 'cursor-not-allowed bg-muted/50' : 'cursor-pointer hover:bg-muted'}`}>
                                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                     <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
                                     <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                    <p className="text-xs text-muted-foreground">4 images required (3 room, 1 bath), PNG, JPG, or JPEG up to 5MB each</p>
+                                    <p className="text-xs text-muted-foreground">4 images required, PNG, JPG, up to 5MB each</p>
                                     </div>
                                     <Input
-                                    id="room-images-input"
-                                    ref={fileInputRef}
-                                    type="file"
-                                    className="hidden"
-                                    multiple
-                                    accept="image/png, image/jpeg"
-                                    onChange={handleFileChange}
+                                        id="room-images-input"
+                                        ref={fileInputRef}
+                                        type="file"
+                                        className="hidden"
+                                        multiple
+                                        accept="image/png, image/jpeg"
+                                        onChange={handleFileChange}
+                                        disabled={isSubmitting}
                                     />
                                 </label>
                                 </div>
@@ -382,15 +397,15 @@ export default function AdminRoomsPage() {
                     />
                     <div className="grid sm:grid-cols-2 gap-4">
                         <FormField control={form.control} name="roomNumber" render={({ field }) => (
-                        <FormItem><FormLabel>Room No.</FormLabel><FormControl><Input placeholder="e.g., E501" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Room No.</FormLabel><FormControl><Input placeholder="e.g., E501" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <FormField control={form.control} name="price" render={({ field }) => (
-                        <FormItem><FormLabel>Price (GHS/Year)</FormLabel><FormControl><Input type="number" placeholder="5000" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Price (GHS/Year)</FormLabel><FormControl><Input type="number" placeholder="5000" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
                         )} />
                     </div>
                     <FormField control={form.control} name="occupancy" render={({ field }) => (
                         <FormItem><FormLabel>Room Occupancy</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                             <FormControl><SelectTrigger><SelectValue placeholder="Select occupancy" /></SelectTrigger></FormControl>
                             <SelectContent>
                             <SelectItem value="1 in a room">1 in a room</SelectItem>
@@ -403,7 +418,7 @@ export default function AdminRoomsPage() {
                         </Select><FormMessage /></FormItem>
                     )} />
                     <FormField control={form.control} name="description" render={({ field }) => (
-                        <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Describe the room and its amenities." {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Describe the room and its amenities." {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={form.control} name="amenities" render={() => (
                         <FormItem>
@@ -414,7 +429,7 @@ export default function AdminRoomsPage() {
                                 <FormItem key={item.id} className="flex flex-row items-start space-x-3 space-y-0">
                                 <FormControl><Checkbox checked={field.value?.includes(item.id)} onCheckedChange={(checked) => {
                                     return checked ? field.onChange([...(field.value || []), item.id]) : field.onChange(field.value?.filter((value) => value !== item.id))
-                                }} /></FormControl>
+                                }} disabled={isSubmitting} /></FormControl>
                                 <FormLabel className="font-normal flex items-center gap-2 cursor-pointer"><item.icon className="w-5 h-5 text-muted-foreground" /><span>{item.label}</span></FormLabel>
                                 </FormItem>
                             )} />
@@ -426,7 +441,7 @@ export default function AdminRoomsPage() {
                 </CardContent>
                 <CardFooter>
                     <div className="flex justify-end gap-2 w-full">
-                        <Button variant="outline" onClick={() => setIsFormVisible(false)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setIsFormVisible(false)} disabled={isSubmitting}>Cancel</Button>
                         <Button type="submit" form="add-room-form" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Room'}</Button>
                     </div>
                 </CardFooter>
@@ -436,3 +451,5 @@ export default function AdminRoomsPage() {
     </>
   )
 }
+
+    
