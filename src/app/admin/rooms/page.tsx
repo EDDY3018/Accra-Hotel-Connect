@@ -6,8 +6,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image';
-import { auth, db } from '@/lib/firebase';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from '@/lib/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { collection, addDoc, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -173,27 +173,33 @@ export default function AdminRoomsPage() {
     }
 
     try {
-      const storage = getStorage();
+      const clean = (s: string) => s.replace(/[#[\\]?*\\n\\r]+/g, '_').trim();
       const imageHints = ["room angle one", "room angle two", "room angle three", "bathroom"];
-      
-      const compressionOptions = {
-        maxSizeMB: 0.5,
-        maxWidthOrHeight: 1920,
-        useWebWorker: true,
-      };
 
       const uploadPromises = values.images.map(async (file, i) => {
-          const compressedFile = await imageCompression(file, compressionOptions);
-          const fileRef = storageRef(storage, `rooms/${user.uid}/${values.roomNumber}/${compressedFile.name}_${Date.now()}`);
-          
-          const metadata = { contentType: file.type };
-          const snapshot = await uploadBytes(fileRef, compressedFile, metadata);
+        // 1) compress
+        const compressed = await imageCompression(file, {
+          maxSizeMB: 0.5,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+        });
 
-          const url = await getDownloadURL(snapshot.ref);
-          return {
-              src: url,
-              hint: imageHints[i] || "room interior"
-          };
+        // 2) safe path + content type
+        const ext = (compressed.type?.includes('png')) ? 'png' : 'jpg';
+        const filename = `${i + 1}_${Date.now()}.${ext}`;
+        const path = `rooms/${user.uid}/${clean(values.roomNumber)}/${clean(filename)}`;
+        const ref = storageRef(storage, path);
+
+        const metadata = { contentType: compressed.type || file.type || 'image/jpeg' };
+
+        // 3) upload (resumable)
+        const task = uploadBytesResumable(ref, compressed, metadata);
+        await new Promise<void>((resolve, reject) => {
+          task.on('state_changed', undefined, reject, () => resolve());
+        });
+
+        const url = await getDownloadURL(task.snapshot.ref);
+        return { src: url, hint: imageHints[i] || "room interior" };
       });
 
       const imageUrls = await Promise.all(uploadPromises);
@@ -222,10 +228,15 @@ export default function AdminRoomsPage() {
       setIsFormVisible(false);
       fetchManagerAndRooms();
     } catch (error: any) {
-      console.error("Error adding room: ", error);
+      console.error("Error adding room:", {
+        code: error?.code,
+        message: error?.message,
+        name: error?.name,
+        serverResponse: error?.customData?.serverResponse, // <-- real server reason
+      });
       let description = 'Could not save the room. Please check the console for more details.';
-      if (error.code && error.code.includes('permission-denied')) {
-        description = 'Permission denied. Please check your Firestore or Storage security rules.';
+      if (error?.code?.includes('permission') || /denied/i.test(error?.message || '')) {
+        description = 'Permission denied. Check Storage rules / App Check.';
       }
       toast({ variant: 'destructive', title: 'Submission Error', description });
     }
