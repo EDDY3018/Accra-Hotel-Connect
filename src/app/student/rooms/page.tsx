@@ -8,9 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, ArrowRight } from "lucide-react"
-import { collection, getDocs, query, where, limit as firestoreLimit } from "firebase/firestore"
+import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -19,13 +18,16 @@ interface Room {
     name: string;
     price: number;
     images: { src: string; hint: string }[];
-    status: 'Available' | 'Occupied' | '1 Spot Left';
+    status: 'Available' | 'Occupied';
     amenities: string[];
     occupancy: string;
+    hostelName: string;
 }
 
 interface GroupedRooms {
-    [key: string]: Room[];
+    [hostelName: string]: {
+        [occupancy: string]: Room[];
+    };
 }
 
 export default function RoomsPage() {
@@ -44,7 +46,7 @@ export default function RoomsPage() {
                 return;
             }
 
-            const roomsByCategory: GroupedRooms = {};
+            const roomsByHostel: GroupedRooms = {};
             roomSnapshot.docs.forEach(doc => {
                 const data = doc.data();
                 const room: Room = {
@@ -55,13 +57,21 @@ export default function RoomsPage() {
                     status: data.status || "Available",
                     amenities: data.amenities || [],
                     occupancy: data.occupancy || 'Other',
+                    hostelName: data.hostelName || 'Unknown Hostel',
                 };
-                if (!roomsByCategory[room.occupancy]) {
-                    roomsByCategory[room.occupancy] = [];
+
+                // Initialize hostel group if it doesn't exist
+                if (!roomsByHostel[room.hostelName]) {
+                    roomsByHostel[room.hostelName] = {};
                 }
-                roomsByCategory[room.occupancy].push(room);
+                // Initialize occupancy category within the hostel if it doesn't exist
+                if (!roomsByHostel[room.hostelName][room.occupancy]) {
+                    roomsByHostel[room.hostelName][room.occupancy] = [];
+                }
+                
+                roomsByHostel[room.hostelName][room.occupancy].push(room);
             });
-            setGroupedRooms(roomsByCategory);
+            setGroupedRooms(roomsByHostel);
         } catch (error) {
             console.error("Error fetching rooms:", error);
             setGroupedRooms({}); 
@@ -77,7 +87,7 @@ export default function RoomsPage() {
         <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
             <div>
                 <h1 className="text-3xl font-bold font-headline">Find Your Next Room</h1>
-                <p className="text-muted-foreground">Browse rooms by category to find the perfect fit for your stay.</p>
+                <p className="text-muted-foreground">Browse available rooms from our partner hostels.</p>
             </div>
             <div className="flex w-full md:w-auto items-center gap-2">
                  <div className="relative flex-1 md:flex-initial">
@@ -88,8 +98,9 @@ export default function RoomsPage() {
         </div>
          {isLoading ? (
              <div className="space-y-8">
-                {[...Array(3)].map((_, i) => (
+                {[...Array(2)].map((_, i) => (
                     <div key={i}>
+                        <Skeleton className="h-9 w-64 mb-6" />
                         <Skeleton className="h-8 w-48 mb-4" />
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                            {[...Array(3)].map((_, j) => (
@@ -115,47 +126,53 @@ export default function RoomsPage() {
                 <p className="text-muted-foreground mt-2">Please check back later. No available rooms were found.</p>
             </div>
         ) : (
-            <div className="space-y-12">
-                {Object.entries(groupedRooms).map(([category, rooms]) => (
-                    <div key={category}>
-                       <div className="flex items-center justify-between mb-4">
-                         <h2 className="text-2xl font-bold font-headline">{category}</h2>
-                         {/* TODO: Create a page to view all rooms of a certain category */}
-                         <Button variant="link" className="text-primary" asChild>
-                            <Link href="#">View More <ArrowRight className="ml-2 h-4 w-4"/></Link>
-                         </Button>
+            <div className="space-y-16">
+                {Object.entries(groupedRooms).map(([hostelName, categories]) => (
+                    <div key={hostelName}>
+                       <h2 className="text-3xl font-bold font-headline mb-8 border-b pb-4">{hostelName}</h2>
+                       <div className="space-y-12">
+                         {Object.entries(categories).map(([category, rooms]) => (
+                            <div key={category}>
+                               <div className="flex items-center justify-between mb-4">
+                                 <h3 className="text-2xl font-bold font-headline">{category}</h3>
+                                 <Button variant="link" className="text-primary" asChild>
+                                    <Link href="#">View More <ArrowRight className="ml-2 h-4 w-4"/></Link>
+                                 </Button>
+                               </div>
+                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                    {rooms.slice(0, 3).map(room => (
+                                        <Card key={room.id} className="overflow-hidden flex flex-col group">
+                                            <CardHeader className="p-0 relative">
+                                                 <Badge className="absolute top-2 right-2 z-10" variant={room.status === 'Available' ? 'default' : 'secondary'}>
+                                                    {room.status}
+                                                </Badge>
+                                                <div className="overflow-hidden rounded-t-lg">
+                                                    <Image
+                                                        src={room.images[0].src}
+                                                        alt={room.name}
+                                                        width={600}
+                                                        height={400}
+                                                        className="aspect-video object-cover transition-transform duration-300 group-hover:scale-105"
+                                                        data-ai-hint={room.images[0].hint}
+                                                    />
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent className="pt-6 flex-1">
+                                                <CardTitle className="font-headline text-xl mb-2">{room.name}</CardTitle>
+                                                <CardDescription>{room.amenities.join(', ')}</CardDescription>
+                                            </CardContent>
+                                            <CardFooter className="flex justify-between items-center">
+                                                <p className="font-semibold text-lg">GHS {room.price}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
+                                                <Button asChild disabled={room.status === 'Occupied'}>
+                                                    <Link href={`/student/rooms/${room.id}`}>View Details</Link>
+                                                </Button>
+                                            </CardFooter>
+                                        </Card>
+                                    ))}
+                                </div>
+                            </div>
+                         ))}
                        </div>
-                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {rooms.slice(0, 3).map(room => (
-                                <Card key={room.id} className="overflow-hidden flex flex-col group">
-                                    <CardHeader className="p-0 relative">
-                                         <Badge className="absolute top-2 right-2 z-10" variant={room.status === 'Available' ? 'default' : 'secondary'}>
-                                            {room.status}
-                                        </Badge>
-                                        <div className="overflow-hidden rounded-t-lg">
-                                            <Image
-                                                src={room.images[0].src}
-                                                alt={room.name}
-                                                width={600}
-                                                height={400}
-                                                className="aspect-video object-cover transition-transform duration-300 group-hover:scale-105"
-                                                data-ai-hint={room.images[0].hint}
-                                            />
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent className="pt-6 flex-1">
-                                        <CardTitle className="font-headline text-xl mb-2">{room.name}</CardTitle>
-                                        <CardDescription>{room.amenities.join(', ')}</CardDescription>
-                                    </CardContent>
-                                    <CardFooter className="flex justify-between items-center">
-                                        <p className="font-semibold text-lg">GHS {room.price}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
-                                        <Button asChild disabled={room.status === 'Occupied'}>
-                                            <Link href={`/student/rooms/${room.id}`}>View Details</Link>
-                                        </Button>
-                                    </CardFooter>
-                                </Card>
-                            ))}
-                        </div>
                     </div>
                 ))}
             </div>
