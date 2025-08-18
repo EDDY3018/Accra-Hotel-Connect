@@ -451,5 +451,3 @@ export default function AdminRoomsPage() {
     </>
   )
 }
-
-    
