@@ -33,6 +33,11 @@ interface GroupedRooms {
 export default function RoomsPage() {
   const [groupedRooms, setGroupedRooms] = useState<GroupedRooms>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [expandedCategories, setExpandedCategories] = useState<{[key: string]: boolean}>({});
+
+  const toggleCategory = (key: string) => {
+    setExpandedCategories(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     async function getRooms() {
@@ -60,11 +65,9 @@ export default function RoomsPage() {
                     hostelName: data.hostelName || 'Unknown Hostel',
                 };
 
-                // Initialize hostel group if it doesn't exist
                 if (!roomsByHostel[room.hostelName]) {
                     roomsByHostel[room.hostelName] = {};
                 }
-                // Initialize occupancy category within the hostel if it doesn't exist
                 if (!roomsByHostel[room.hostelName][room.occupancy]) {
                     roomsByHostel[room.hostelName][room.occupancy] = [];
                 }
@@ -131,47 +134,56 @@ export default function RoomsPage() {
                     <div key={hostelName}>
                        <h2 className="text-3xl font-bold font-headline mb-8 border-b pb-4">{hostelName}</h2>
                        <div className="space-y-12">
-                         {Object.entries(categories).map(([category, rooms]) => (
-                            <div key={category}>
-                               <div className="flex items-center justify-between mb-4">
-                                 <h3 className="text-2xl font-bold font-headline">{category}</h3>
-                                 <Button variant="link" className="text-primary" asChild>
-                                    <Link href="#">View More <ArrowRight className="ml-2 h-4 w-4"/></Link>
-                                 </Button>
-                               </div>
-                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                    {rooms.slice(0, 3).map(room => (
-                                        <Card key={room.id} className="overflow-hidden flex flex-col group">
-                                            <CardHeader className="p-0 relative">
-                                                 <Badge className="absolute top-2 right-2 z-10" variant={room.status === 'Available' ? 'default' : 'secondary'}>
-                                                    {room.status}
-                                                </Badge>
-                                                <div className="overflow-hidden rounded-t-lg">
-                                                    <Image
-                                                        src={room.images[0].src}
-                                                        alt={room.name}
-                                                        width={600}
-                                                        height={400}
-                                                        className="aspect-video object-cover transition-transform duration-300 group-hover:scale-105"
-                                                        data-ai-hint={room.images[0].hint}
-                                                    />
-                                                </div>
-                                            </CardHeader>
-                                            <CardContent className="pt-6 flex-1">
-                                                <CardTitle className="font-headline text-xl mb-2">{room.name}</CardTitle>
-                                                <CardDescription>{room.amenities.join(', ')}</CardDescription>
-                                            </CardContent>
-                                            <CardFooter className="flex justify-between items-center">
-                                                <p className="font-semibold text-lg">GHS {room.price}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
-                                                <Button asChild disabled={room.status === 'Occupied'}>
-                                                    <Link href={`/student/rooms/${room.id}`}>View Details</Link>
-                                                </Button>
-                                            </CardFooter>
-                                        </Card>
-                                    ))}
+                         {Object.entries(categories).map(([category, rooms]) => {
+                            const categoryKey = `${hostelName}-${category}`;
+                            const isExpanded = expandedCategories[categoryKey];
+                            const visibleRooms = isExpanded ? rooms : rooms.slice(0, 3);
+                            
+                            return (
+                                <div key={category}>
+                                   <div className="flex items-center justify-between mb-4">
+                                     <h3 className="text-2xl font-bold font-headline">{category}</h3>
+                                     {rooms.length > 3 && (
+                                        <Button variant="link" className="text-primary" onClick={() => toggleCategory(categoryKey)}>
+                                            {isExpanded ? 'View Less' : 'View More'}
+                                            <ArrowRight className="ml-2 h-4 w-4"/>
+                                        </Button>
+                                     )}
+                                   </div>
+                                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                        {visibleRooms.map(room => (
+                                            <Card key={room.id} className="overflow-hidden flex flex-col group">
+                                                <CardHeader className="p-0 relative">
+                                                     <Badge className="absolute top-2 right-2 z-10" variant={room.status === 'Available' ? 'default' : 'secondary'}>
+                                                        {room.status}
+                                                    </Badge>
+                                                    <div className="overflow-hidden rounded-t-lg">
+                                                        <Image
+                                                            src={room.images[0].src}
+                                                            alt={room.name}
+                                                            width={600}
+                                                            height={400}
+                                                            className="aspect-video object-cover transition-transform duration-300 group-hover:scale-105"
+                                                            data-ai-hint={room.images[0].hint}
+                                                        />
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="pt-6 flex-1">
+                                                    <CardTitle className="font-headline text-xl mb-2">{room.name}</CardTitle>
+                                                    <CardDescription>{room.amenities.join(', ')}</CardDescription>
+                                                </CardContent>
+                                                <CardFooter className="flex justify-between items-center">
+                                                    <p className="font-semibold text-lg">GHS {room.price}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
+                                                    <Button asChild disabled={room.status === 'Occupied'}>
+                                                        <Link href={`/student/rooms/${room.id}`}>View Details</Link>
+                                                    </Button>
+                                                </CardFooter>
+                                            </Card>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                         ))}
+                             )
+                         })}
                        </div>
                     </div>
                 ))}
