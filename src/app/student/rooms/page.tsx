@@ -1,17 +1,18 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from "next/link"
 import Image from "next/image"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Search, ArrowRight } from "lucide-react"
+import { Search, ArrowRight, TrendingUp } from "lucide-react"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Room {
     id: string;
@@ -31,9 +32,12 @@ interface GroupedRooms {
 }
 
 export default function RoomsPage() {
-  const [groupedRooms, setGroupedRooms] = useState<GroupedRooms>({});
+  const [allRooms, setAllRooms] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<{[key: string]: boolean}>({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('default');
+  const [occupancyFilter, setOccupancyFilter] = useState('all');
 
   const toggleCategory = (key: string) => {
     setExpandedCategories(prev => ({ ...prev, [key]: !prev[key] }));
@@ -46,15 +50,9 @@ export default function RoomsPage() {
             const roomsQuery = query(collection(db, 'rooms'), where('status', '==', 'Available'));
             const roomSnapshot = await getDocs(roomsQuery);
 
-            if (roomSnapshot.empty) {
-                setGroupedRooms({});
-                return;
-            }
-
-            const roomsByHostel: GroupedRooms = {};
-            roomSnapshot.docs.forEach(doc => {
-                const data = doc.data();
-                const room: Room = {
+            const fetchedRooms = roomSnapshot.docs.map(doc => {
+                 const data = doc.data();
+                 return {
                     id: doc.id,
                     name: data.name || "Unnamed Room",
                     price: data.price || 0,
@@ -63,27 +61,57 @@ export default function RoomsPage() {
                     amenities: data.amenities || [],
                     occupancy: data.occupancy || 'Other',
                     hostelName: data.hostelName || 'Unknown Hostel',
-                };
-
-                if (!roomsByHostel[room.hostelName]) {
-                    roomsByHostel[room.hostelName] = {};
-                }
-                if (!roomsByHostel[room.hostelName][room.occupancy]) {
-                    roomsByHostel[room.hostelName][room.occupancy] = [];
-                }
-                
-                roomsByHostel[room.hostelName][room.occupancy].push(room);
+                } as Room;
             });
-            setGroupedRooms(roomsByHostel);
+            setAllRooms(fetchedRooms);
+
         } catch (error) {
             console.error("Error fetching rooms:", error);
-            setGroupedRooms({}); 
+            setAllRooms([]); 
         } finally {
             setIsLoading(false);
         }
     }
     getRooms();
   }, []);
+
+  const groupedRooms = useMemo(() => {
+    let filtered = [...allRooms];
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(room => 
+        room.hostelName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        room.amenities.join(' ').toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Occupancy filter
+    if (occupancyFilter !== 'all') {
+      filtered = filtered.filter(room => room.occupancy === `${occupancyFilter} in a room`);
+    }
+
+    // Sort
+    if (sortBy === 'price-asc') {
+      filtered.sort((a, b) => a.price - b.price);
+    } else if (sortBy === 'price-desc') {
+      filtered.sort((a, b) => b.price - a.price);
+    }
+
+    // Grouping
+    const roomsByHostel: GroupedRooms = {};
+    filtered.forEach(room => {
+        if (!roomsByHostel[room.hostelName]) {
+            roomsByHostel[room.hostelName] = {};
+        }
+        if (!roomsByHostel[room.hostelName][room.occupancy]) {
+            roomsByHostel[room.hostelName][room.occupancy] = [];
+        }
+        roomsByHostel[room.hostelName][room.occupancy].push(room);
+    });
+    return roomsByHostel;
+  }, [allRooms, searchTerm, sortBy, occupancyFilter]);
 
   return (
     <>
@@ -92,13 +120,44 @@ export default function RoomsPage() {
                 <h1 className="text-3xl font-bold font-headline">Find Your Next Room</h1>
                 <p className="text-muted-foreground">Browse available rooms from our partner hostels.</p>
             </div>
-            <div className="flex w-full md:w-auto items-center gap-2">
-                 <div className="relative flex-1 md:flex-initial">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search rooms..." className="pl-8" />
-                </div>
+             <div className="relative flex-1 md:flex-initial w-full md:w-auto">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search hostel or room type..." className="pl-8" onChange={(e) => setSearchTerm(e.target.value)} value={searchTerm}/>
             </div>
         </div>
+
+        <Card className="mb-8">
+            <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    <span>Sort & Filter:</span>
+                </div>
+                <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 w-full md:w-auto">
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Sort by price" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="default">Default</SelectItem>
+                            <SelectItem value="price-asc">Price: Low to High</SelectItem>
+                            <SelectItem value="price-desc">Price: High to Low</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select value={occupancyFilter} onValueChange={setOccupancyFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Room occupancy" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Occupancies</SelectItem>
+                            {[1,2,3,4,5,6].map(n => (
+                                <SelectItem key={n} value={String(n)}>{n} in a room</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </CardContent>
+        </Card>
+
          {isLoading ? (
              <div className="space-y-8">
                 {[...Array(2)].map((_, i) => (
@@ -125,8 +184,8 @@ export default function RoomsPage() {
             </div>
         ) : Object.keys(groupedRooms).length === 0 ? (
             <div className="text-center py-16">
-                <h2 className="text-2xl font-semibold">No Rooms Available</h2>
-                <p className="text-muted-foreground mt-2">Please check back later. No available rooms were found.</p>
+                <h2 className="text-2xl font-semibold">No Rooms Found</h2>
+                <p className="text-muted-foreground mt-2">Your search or filter returned no results. Try something else!</p>
             </div>
         ) : (
             <div className="space-y-16">
