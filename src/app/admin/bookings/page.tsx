@@ -43,7 +43,7 @@ interface Booking {
   roomNumber: string;
   bookingDate: string;
   price: number;
-  status: 'Paid' | 'Unpaid' | 'Completed';
+  status: 'Paid' | 'Unpaid' | 'Completed' | 'Cancelled';
 }
 
 export default function AdminBookingsPage() {
@@ -152,7 +152,7 @@ export default function AdminBookingsPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-headline">Bookings</CardTitle>
+        <CardTitle className="font-headline">Booking History</CardTitle>
         <CardDescription>View and manage all room bookings.</CardDescription>
         <div className="flex items-center gap-2 pt-4">
           <div className="relative w-full md:w-1/3">
@@ -192,7 +192,12 @@ export default function AdminBookingsPage() {
                     <TableCell>{booking.roomNumber}</TableCell>
                     <TableCell>{booking.bookingDate}</TableCell>
                     <TableCell>
-                      <Badge variant={booking.status === "Paid" ? "default" : booking.status === "Completed" ? "secondary" : "destructive"}>
+                      <Badge variant={
+                        booking.status === "Paid" ? "default" 
+                        : booking.status === "Completed" ? "secondary" 
+                        : booking.status === "Unpaid" ? "destructive"
+                        : "outline"
+                      }>
                         {booking.status}
                       </Badge>
                     </TableCell>

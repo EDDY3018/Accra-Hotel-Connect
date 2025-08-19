@@ -337,6 +337,7 @@ export default function StudentDashboardPage() {
                   <>
                     <p className="text-2xl font-bold">GHS {paymentInfo.balance.toFixed(2)}</p>
                     <p className="text-sm text-muted-foreground">Due: {paymentInfo.dueDate}</p>
+                    <p className="text-xs text-muted-foreground/80 mt-1">Payment is due one month after booking date.</p>
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground py-2">You have no outstanding balance. Great job!</p>
