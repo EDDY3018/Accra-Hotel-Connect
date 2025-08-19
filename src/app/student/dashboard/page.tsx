@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bell, FileWarning, BedDouble, Building, MapPin, Phone, Handshake, XCircle } from "lucide-react";
 import { auth, db } from '@/lib/firebase';
@@ -39,6 +39,7 @@ interface Announcement {
   title: string;
   content: string;
   date: string;
+  author: string;
 }
 
 interface RoomInfo {
@@ -66,6 +67,7 @@ export default function StudentDashboardPage() {
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [managerInfo, setManagerInfo] = useState<{ name: string; hostel: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -100,7 +102,7 @@ export default function StudentDashboardPage() {
             }
             
             let bookingId = null;
-            let managerInfo: ManagerInfo | null = null;
+            let fetchedManagerInfo: ManagerInfo | null = null;
             if(userData.outstandingBalance > 0 || userData.roomId) {
               const bookingsQuery = query(
                 collection(db, "bookings"), 
@@ -117,11 +119,12 @@ export default function StudentDashboardPage() {
                   const managerDoc = await getDoc(managerDocRef);
                   if (managerDoc.exists()) {
                       const managerData = managerDoc.data();
-                      managerInfo = {
+                      fetchedManagerInfo = {
                           hostelName: managerData.hostelName,
                           location: managerData.location,
                           phone: managerData.phone
                       };
+                      setManagerInfo({ name: managerData.fullName, hostel: managerData.hostelName });
                   }
               }
             }
@@ -131,7 +134,7 @@ export default function StudentDashboardPage() {
                 balance: userData.outstandingBalance,
                 dueDate: userData.dueDate ? new Date(userData.dueDate).toLocaleDateString() : 'Not specified',
                 bookingId: bookingId,
-                managerInfo: managerInfo,
+                managerInfo: fetchedManagerInfo,
               });
             } else {
               setPaymentInfo(null);
@@ -153,9 +156,19 @@ export default function StudentDashboardPage() {
                         title: data.title,
                         content: data.content,
                         date: data.createdAt?.toDate().toLocaleDateString() ?? 'N/A',
+                        author: data.author,
                     }
                 });
                 setAnnouncements(fetchedAnnouncements);
+                
+                 if (!managerInfo && fetchedAnnouncements.length > 0) {
+                    const managerDocRef = doc(db, 'users', userData.managerUid);
+                    const managerDoc = await getDoc(managerDocRef);
+                    if (managerDoc.exists()) {
+                        const managerData = managerDoc.data();
+                        setManagerInfo({ name: managerData.fullName, hostel: managerData.hostelName });
+                    }
+                }
             } else {
               setAnnouncements([]);
             }
@@ -237,23 +250,25 @@ export default function StudentDashboardPage() {
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            {isLoading ? (
-              <Skeleton className="h-8 w-48" />
-            ) : (
-              <CardTitle className="font-headline">Welcome back, {userName || 'Student'}!</CardTitle>
-            )}
-            <CardDescription>Here's a summary of your stay.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <div className="p-4 bg-muted/50 rounded-lg flex flex-col justify-between">
-              <div>
+      <div className="mb-6">
+         {isLoading ? (
+            <Skeleton className="h-8 w-48" />
+          ) : (
+            <h1 className="text-3xl font-bold font-headline">Welcome back, {userName || 'Student'}!</h1>
+          )}
+          <p className="text-muted-foreground">Here's a summary of your stay.</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="lg:col-span-2 grid gap-6 sm:grid-cols-2">
+            <Card>
+              <CardHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <BedDouble className="w-6 h-6 text-primary" />
                   <h3 className="font-semibold">Your Room</h3>
                 </div>
+              </CardHeader>
+              <CardContent>
                 {isLoading ? (
                   <div className="space-y-2">
                     <Skeleton className="h-7 w-20" />
@@ -267,24 +282,28 @@ export default function StudentDashboardPage() {
                 ) : (
                     <p className="text-sm text-muted-foreground py-2">No room has been assigned to you yet.</p>
                 )}
-              </div>
-              {!isLoading && roomInfo && (
-                  <Button asChild size="sm" className="mt-auto w-fit">
-                    <Link href={`/student/rooms/${roomInfo.id}`}>View Details</Link>
-                  </Button>
-              )}
-               {!isLoading && !roomInfo && (
-                  <Button size="sm" asChild className="mt-auto w-fit">
-                    <Link href="/student/rooms">Browse Rooms</Link>
-                  </Button>
-              )}
-            </div>
-            <div className="p-4 bg-muted/50 rounded-lg flex flex-col justify-between">
-              <div>
+              </CardContent>
+              <CardFooter>
+                 {!isLoading && roomInfo && (
+                    <Button asChild size="sm" className="w-fit">
+                      <Link href={`/student/rooms/${roomInfo.id}`}>View Details</Link>
+                    </Button>
+                )}
+                 {!isLoading && !roomInfo && (
+                    <Button size="sm" asChild className="w-fit">
+                      <Link href="/student/rooms">Browse Rooms</Link>
+                    </Button>
+                )}
+              </CardFooter>
+            </Card>
+            <Card>
+              <CardHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <FileWarning className="w-6 h-6 text-destructive" />
                   <h3 className="font-semibold">Outstanding Balance</h3>
                 </div>
+              </CardHeader>
+               <CardContent>
                 {isLoading ? (
                   <div className="space-y-2">
                     <Skeleton className="h-7 w-28" />
@@ -298,12 +317,13 @@ export default function StudentDashboardPage() {
                 ) : (
                   <p className="text-sm text-muted-foreground py-2">You have no outstanding balance. Great job!</p>
                 )}
-              </div>
-               {!isLoading && paymentInfo && paymentInfo.balance > 0 && (
-                 <div className="flex items-center gap-2 mt-auto">
+              </CardContent>
+               <CardFooter className="flex flex-col items-start gap-2">
+                 {!isLoading && paymentInfo && paymentInfo.balance > 0 && (
+                   <>
                     <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
                       <DialogTrigger asChild>
-                        <Button size="sm" className="w-fit">View Payment Instructions</Button>
+                        <Button size="sm" className="w-full">View Payment Instructions</Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
@@ -350,7 +370,7 @@ export default function StudentDashboardPage() {
                     </Dialog>
                     <AlertDialog>
                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm" className="w-fit">Cancel Booking</Button>
+                          <Button variant="destructive" size="sm" className="w-full">Cancel Booking</Button>
                        </AlertDialogTrigger>
                        <AlertDialogContent>
                           <AlertDialogHeader>
@@ -373,17 +393,31 @@ export default function StudentDashboardPage() {
                           </AlertDialogFooter>
                        </AlertDialogContent>
                     </AlertDialog>
-                 </div>
+                   </>
                )}
-            </div>
-          </CardContent>
-        </Card>
+              </CardFooter>
+            </Card>
+        </div>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="font-headline text-lg">Announcements</CardTitle>
+          <CardHeader className="flex flex-row items-start justify-between pb-2">
+            <div>
+              <CardTitle className="font-headline text-lg">Announcements</CardTitle>
+              <CardDescription className="text-xs">General information from the hostel Manager</CardDescription>
+            </div>
             <Bell className="w-5 h-5 text-primary" />
           </CardHeader>
           <CardContent>
+             {isLoading ? (
+                <>
+                  <Skeleton className="h-6 w-32 mb-2"/>
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full mt-4" />
+                </>
+             ) : managerInfo ? (
+                <div className="text-sm font-semibold mb-4 p-2 bg-muted/50 rounded-md">
+                    <p>{managerInfo.hostel} <span className="font-normal text-muted-foreground">({managerInfo.name})</span></p>
+                </div>
+             ) : null }
              <div className="space-y-4">
               {isLoading ? (
                 <>
@@ -394,7 +428,7 @@ export default function StudentDashboardPage() {
                 <p className="text-sm text-muted-foreground text-center py-4">No new announcements.</p>
               ) : (
                 announcements.map((item) => (
-                  <div key={item.id} className="grid gap-1.5">
+                  <div key={item.id} className="grid gap-1.5 border-b pb-2 last:border-none">
                     <div className="flex items-center justify-between">
                       <p className="font-semibold">{item.title}</p>
                       <span className="text-xs text-muted-foreground">{item.date}</span>
