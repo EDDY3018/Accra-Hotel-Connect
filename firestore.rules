@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -7,29 +8,15 @@ service cloud.firestore {
     // Allow managers to read profiles of students they manage.
     match /users/{userId} {
       allow create: if request.auth != null;
-      allow update: if request.auth != null && request.auth.uid == userId;
+      allow read, update: if request.auth != null && request.auth.uid == userId;
       
-      // Read access is complex:
-      // 1. You can read your own profile.
-      // 2. A student can read their manager's profile.
-      // 3. A manager can read their students' profiles.
-      allow read: if request.auth != null && (
-        request.auth.uid == userId ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.managerUid == userId) ||
-        (exists(/databases/$(database)/documents/users/$(userId)) &&
-         get(/databases/$(database)/documents/users/$(userId)).data.managerUid == request.auth.uid)
-      );
-      
-      // Managers can list students associated with them.
-      // Note: This requires a client-side query where('managerUid', '==', auth.currentUser.uid)
       allow list: if request.auth != null && 
                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager';
     }
 
     // ROOMS: Allow any authenticated user to list and read rooms. Only managers can edit their own rooms.
     match /rooms/{roomId} {
-      allow read: if request.auth != null; // Changed from read, list
+      allow read: if request.auth != null; 
       allow create: if request.auth != null && request.resource.data.managerUid == request.auth.uid;
       allow update, delete: if request.auth != null && resource.data.managerUid == request.auth.uid;
     }
@@ -37,34 +24,44 @@ service cloud.firestore {
     // BOOKINGS: Students can manage their own bookings. Managers can view bookings for their hostel.
     match /bookings/{bookingId} {
        allow create: if request.auth != null && request.resource.data.studentUid == request.auth.uid;
-       allow read, update: if request.auth != null && (
-        resource.data.studentUid == request.auth.uid || 
-        resource.data.managerUid == request.auth.uid ||
-        (request.resource.data.status == 'Cancelled' && resource.data.studentUid == request.auth.uid)
-       );
+       allow read, update: if request.auth != null && (resource.data.studentUid == request.auth.uid || resource.data.managerUid == request.auth.uid);
+       allow list: if request.auth != null && (request.query.where.studentUid == request.auth.uid || request.query.where.managerUid == request.auth.uid);
     }
 
-    // PAYMENTS: Students can create and view their own payments.
+    // PAYMENTS: Students can create and view their own payments. Managers can see payments for their students.
     match /payments/{paymentId} {
       allow create: if request.auth != null && request.resource.data.studentUid == request.auth.uid;
-      allow read: if request.auth != null && resource.data.studentUid == request.auth.uid;
+      allow read, list: if request.auth != null && (
+          request.query.where.studentUid == request.auth.uid || 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager'
+      );
     }
 
     // TICKETS: Students can manage their own tickets. Managers can manage tickets for their hostel.
     match /tickets/{ticketId} {
       allow create: if request.auth != null && request.resource.data.studentUid == request.auth.uid;
       allow read, update: if request.auth != null && (resource.data.studentUid == request.auth.uid || resource.data.managerUid == request.auth.uid);
+      allow list: if request.auth != null && (request.query.where.studentUid == request.auth.uid || request.query.where.managerUid == request.auth.uid);
     }
 
     // ANNOUNCEMENTS: Students can read announcements. Managers can manage their own announcements.
     match /announcements/{announcementId} {
       allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null && resource.data.managerUid == request.auth.uid;
+      allow create, update, delete: if request.auth != null && request.resource.data.managerUid == request.auth.uid;
+      allow list: if request.auth != null;
     }
-    
-    // MAIL: Allow authenticated users to create email documents for the Trigger Email extension.
-    match /mail/{docId} {
+
+    // CANCELLATIONS: Students can create cancellation records. Managers can read them.
+    match /cancellations/{cancellationId} {
+      allow create: if request.auth != null && request.resource.data.studentUid == request.auth.uid;
+      allow read, list: if request.auth != null && request.query.where.managerUid == request.auth.uid;
+    }
+
+    // MAIL: Allow authenticated users to create email documents. The backend function handles the rest.
+    match /mail/{mailId} {
       allow create: if request.auth != null;
     }
   }
 }
+
+    

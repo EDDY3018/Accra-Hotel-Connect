@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -14,6 +15,7 @@ import {
   Settings,
   LayoutDashboard,
   LogOut,
+  XSquare,
 } from "lucide-react";
 import {
   Sidebar,
@@ -45,6 +47,7 @@ const adminNavItems = [
   { href: "/admin/students", icon: Users, label: "Students" },
   { href: "/admin/bookings", icon: BookCheck, label: "Bookings" },
   { href: "/admin/rooms", icon: BedDouble, label: "Rooms" },
+  { href: "/admin/cancellations", icon: XSquare, label: "Cancellations" },
   { href: "/admin/support", icon: LifeBuoy, label: "Support Tickets" },
   { href: "/admin/announcements", icon: Megaphone, label: "Announcements" },
 ];
@@ -165,3 +168,5 @@ export function AdminSidebar() {
     </Sidebar>
   );
 }
+
+    

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Bell, FileWarning, BedDouble, Building, MapPin, Phone, Handshake, XCircle } from "lucide-react";
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, writeBatch, serverTimestamp, setDoc, collectionGroup } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -59,6 +59,7 @@ interface PaymentInfo {
   dueDate: string;
   bookingId: string | null;
   managerInfo: ManagerInfo | null;
+  managerUid: string | null;
 }
 
 export default function StudentDashboardPage() {
@@ -84,7 +85,7 @@ export default function StudentDashboardPage() {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             const fullName = userData.fullName || '';
-            setUserName(fullName.split(' ')[0]);
+            setUserName(fullName);
 
             if (userData.roomId) {
               const roomDocRef = doc(db, 'rooms', userData.roomId);
@@ -103,6 +104,7 @@ export default function StudentDashboardPage() {
             
             let bookingId = null;
             let fetchedManagerInfo: ManagerInfo | null = null;
+            let managerUid: string | null = null;
             if(userData.outstandingBalance > 0 || userData.roomId) {
               const bookingsQuery = query(
                 collection(db, "bookings"), 
@@ -115,6 +117,7 @@ export default function StudentDashboardPage() {
                   const bookingDoc = querySnapshot.docs[0];
                   const bookingData = bookingDoc.data();
                   bookingId = bookingDoc.id;
+                  managerUid = bookingData.managerUid;
                   const managerDocRef = doc(db, 'users', bookingData.managerUid);
                   const managerDoc = await getDoc(managerDocRef);
                   if (managerDoc.exists()) {
@@ -135,15 +138,17 @@ export default function StudentDashboardPage() {
                 dueDate: userData.dueDate ? new Date(userData.dueDate).toLocaleDateString() : 'Not specified',
                 bookingId: bookingId,
                 managerInfo: fetchedManagerInfo,
+                managerUid: managerUid,
               });
             } else {
               setPaymentInfo(null);
             }
 
-            if (userData.managerUid) {
+            const associatedManagerUid = userData.managerUid || managerUid;
+            if (associatedManagerUid) {
                 const announcementsQuery = query(
                     collection(db, 'announcements'),
-                    where('managerUid', '==', userData.managerUid),
+                    where('managerUid', '==', associatedManagerUid),
                     where('status', '==', 'Published'),
                     orderBy('createdAt', 'desc'),
                     limit(5)
@@ -162,7 +167,7 @@ export default function StudentDashboardPage() {
                 setAnnouncements(fetchedAnnouncements);
                 
                  if (!managerInfo && fetchedAnnouncements.length > 0) {
-                    const managerDocRef = doc(db, 'users', userData.managerUid);
+                    const managerDocRef = doc(db, 'users', associatedManagerUid);
                     const managerDoc = await getDoc(managerDocRef);
                     if (managerDoc.exists()) {
                         const managerData = managerDoc.data();
@@ -206,7 +211,7 @@ export default function StudentDashboardPage() {
   
   const handleCancelBooking = async () => {
       const user = auth.currentUser;
-      if (!user || !roomInfo || !paymentInfo?.bookingId) {
+      if (!user || !roomInfo || !paymentInfo?.bookingId || !paymentInfo?.managerUid) {
           toast({ variant: 'destructive', title: 'Error', description: 'Could not cancel booking. Information missing.' });
           return;
       }
@@ -235,6 +240,20 @@ export default function StudentDashboardPage() {
           const roomRef = doc(db, 'rooms', roomInfo.id);
           batch.update(roomRef, { status: 'Available' });
 
+          // 4. Create cancellation record
+          const cancellationRef = doc(collection(db, 'cancellations'));
+          batch.set(cancellationRef, {
+              studentUid: user.uid,
+              studentName: userName,
+              bookingId: paymentInfo.bookingId,
+              roomId: roomInfo.id,
+              roomNumber: roomInfo.roomNumber,
+              managerUid: paymentInfo.managerUid,
+              reason: cancellationReason,
+              cancelledAt: serverTimestamp(),
+          });
+
+
           await batch.commit();
           toast({ title: 'Booking Cancelled', description: 'Your booking has been successfully cancelled.' });
           fetchUserData(); // Refresh data
@@ -252,11 +271,16 @@ export default function StudentDashboardPage() {
     <>
       <div className="mb-6">
          {isLoading ? (
-            <Skeleton className="h-8 w-48" />
+            <>
+              <Skeleton className="h-8 w-64 mb-2" />
+              <Skeleton className="h-4 w-48" />
+            </>
           ) : (
-            <h1 className="text-3xl font-bold font-headline">Welcome back, {userName || 'Student'}!</h1>
+            <>
+              <h1 className="text-3xl font-bold font-headline">Welcome back, {userName.split(' ')[0] || 'Student'}!</h1>
+              <p className="text-muted-foreground">Here's a summary of your stay.</p>
+            </>
           )}
-          <p className="text-muted-foreground">Here's a summary of your stay.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -409,7 +433,7 @@ export default function StudentDashboardPage() {
           <CardContent>
              {isLoading ? (
                 <>
-                  <Skeleton className="h-6 w-32 mb-2"/>
+                  <Skeleton className="h-10 w-full mb-4" />
                   <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-10 w-full mt-4" />
                 </>
@@ -444,3 +468,5 @@ export default function StudentDashboardPage() {
     </>
   );
 }
+
+    
