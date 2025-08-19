@@ -132,7 +132,10 @@ export default function RoomsPage() {
             <div className="space-y-16">
                 {Object.entries(groupedRooms).map(([hostelName, categories]) => (
                     <div key={hostelName}>
-                       <h2 className="text-3xl font-bold font-headline mb-8 border-b pb-4">{hostelName}</h2>
+                       <div className="mb-8 border-b pb-4">
+                            <p className="text-sm text-primary font-semibold font-headline tracking-wider">HOSTEL NAME</p>
+                            <h2 className="text-3xl font-bold font-headline">{hostelName}</h2>
+                       </div>
                        <div className="space-y-12">
                          {Object.entries(categories).map(([category, rooms]) => {
                             const categoryKey = `${hostelName}-${category}`;
