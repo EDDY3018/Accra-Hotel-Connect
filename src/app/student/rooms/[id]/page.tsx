@@ -46,7 +46,7 @@ import {
   Phone,
   AlertCircle,
 } from 'lucide-react';
-import { doc, getDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -164,7 +164,9 @@ export default function RoomDetailPage() {
 
     try {
         const batch = writeBatch(db);
+        const bookingDate = new Date();
 
+        // 1. Create the booking document
         const bookingRef = doc(db, 'bookings', `${user.uid}_${roomDetails.id}`);
         batch.set(bookingRef, {
             studentUid: user.uid,
@@ -174,10 +176,11 @@ export default function RoomDetailPage() {
             hostelName: roomDetails.hostelName,
             price: roomDetails.price,
             managerUid: roomDetails.managerUid,
-            bookingDate: new Date().toISOString(),
+            bookingDate: bookingDate.toISOString(),
             status: 'Unpaid'
         });
 
+        // 2. Update the user's profile with booking info
         const userRef = doc(db, 'users', user.uid);
         batch.update(userRef, {
             roomId: roomDetails.id,
@@ -186,10 +189,29 @@ export default function RoomDetailPage() {
             dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
             managerUid: roomDetails.managerUid
         });
+
+        // 3. Create the email document for the Trigger Email extension
+        const mailRef = doc(collection(db, 'mail'));
+        batch.set(mailRef, {
+            to: values.email,
+            template: {
+                name: 'bookingConfirmation',
+                data: {
+                    studentName: values.fullName,
+                    roomNumber: roomDetails.roomNumber,
+                    price: roomDetails.price.toFixed(2),
+                    hostelName: roomDetails.hostelName,
+                    hostelLocation: roomDetails.location,
+                    hostelPhone: roomDetails.managerPhone,
+                    bookingDate: bookingDate.toLocaleDateString(),
+                    bookingId: bookingRef.id,
+                }
+            }
+        });
         
         await batch.commit();
 
-        toast({ title: 'Booking Successful!', description: "Your room has been secured. Redirecting to dashboard..." });
+        toast({ title: 'Booking Successful!', description: "Your room has been secured. A confirmation email is on its way. Redirecting..." });
         router.push('/student/dashboard');
 
     } catch (error: any) {
@@ -363,3 +385,5 @@ export default function RoomDetailPage() {
     </div>
   )
 }
+
+    
