@@ -5,9 +5,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bell, FileWarning, BedDouble, Building, MapPin, Phone, Handshake } from "lucide-react";
+import { Bell, FileWarning, BedDouble, Building, MapPin, Phone, Handshake, XCircle } from "lucide-react";
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, writeBatch } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -21,6 +21,18 @@ import {
 } from "@/components/ui/dialog"
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface Announcement {
   id: string;
@@ -56,7 +68,109 @@ export default function StudentDashboardPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState('');
+  
+  const fetchUserData = async () => {
+      setIsLoading(true);
+      const user = auth.currentUser;
+      if (user) {
+        try {
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
 
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            const fullName = userData.fullName || '';
+            setUserName(fullName.split(' ')[0]);
+
+            if (userData.roomId) {
+              const roomDocRef = doc(db, 'rooms', userData.roomId);
+              const roomDoc = await getDoc(roomDocRef);
+              if (roomDoc.exists()) {
+                const roomData = roomDoc.data();
+                setRoomInfo({
+                  id: roomDoc.id,
+                  roomNumber: roomData.roomNumber || 'N/A',
+                  name: roomData.name || 'Room details not found'
+                });
+              }
+            } else {
+              setRoomInfo(null);
+            }
+            
+            let bookingId = null;
+            let managerInfo: ManagerInfo | null = null;
+            if(userData.outstandingBalance > 0 || userData.roomId) {
+              const bookingsQuery = query(
+                collection(db, "bookings"), 
+                where("studentUid", "==", user.uid), 
+                where("status", "in", ["Unpaid", "Paid"]),
+                limit(1)
+              );
+              const querySnapshot = await getDocs(bookingsQuery);
+              if (!querySnapshot.empty) {
+                  const bookingDoc = querySnapshot.docs[0];
+                  const bookingData = bookingDoc.data();
+                  bookingId = bookingDoc.id;
+                  const managerDocRef = doc(db, 'users', bookingData.managerUid);
+                  const managerDoc = await getDoc(managerDocRef);
+                  if (managerDoc.exists()) {
+                      const managerData = managerDoc.data();
+                      managerInfo = {
+                          hostelName: managerData.hostelName,
+                          location: managerData.location,
+                          phone: managerData.phone
+                      };
+                  }
+              }
+            }
+
+            if (userData.outstandingBalance && userData.outstandingBalance > 0) {
+              setPaymentInfo({
+                balance: userData.outstandingBalance,
+                dueDate: userData.dueDate ? new Date(userData.dueDate).toLocaleDateString() : 'Not specified',
+                bookingId: bookingId,
+                managerInfo: managerInfo,
+              });
+            } else {
+              setPaymentInfo(null);
+            }
+
+            if (userData.managerUid) {
+                const announcementsQuery = query(
+                    collection(db, 'announcements'),
+                    where('managerUid', '==', userData.managerUid),
+                    where('status', '==', 'Published'),
+                    orderBy('createdAt', 'desc'),
+                    limit(5)
+                );
+                const announcementsSnapshot = await getDocs(announcementsQuery);
+                const fetchedAnnouncements = announcementsSnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        title: data.title,
+                        content: data.content,
+                        date: data.createdAt?.toDate().toLocaleDateString() ?? 'N/A',
+                    }
+                });
+                setAnnouncements(fetchedAnnouncements);
+            } else {
+              setAnnouncements([]);
+            }
+          }
+        } catch (error: any) {
+            console.error("Error fetching user data:", error);
+            toast({ variant: 'destructive', title: 'Error loading dashboard', description: 'Could not fetch your data. See console for details.' });
+        } finally {
+            setIsLoading(false);
+        }
+      } else {
+        setIsLoading(false);
+      }
+    };
+    
   const onPaymentModalClose = () => {
     setIsPaymentModalOpen(false);
     toast({
@@ -66,105 +180,6 @@ export default function StudentDashboardPage() {
   }
 
   useEffect(() => {
-    const fetchUserData = async () => {
-        setIsLoading(true);
-        const user = auth.currentUser;
-        if (user) {
-          try {
-            const userDocRef = doc(db, 'users', user.uid);
-            const userDoc = await getDoc(userDocRef);
-
-            if (userDoc.exists()) {
-              const userData = userDoc.data();
-              const fullName = userData.fullName || '';
-              setUserName(fullName.split(' ')[0]);
-
-              if (userData.roomId) {
-                const roomDocRef = doc(db, 'rooms', userData.roomId);
-                const roomDoc = await getDoc(roomDocRef);
-                if (roomDoc.exists()) {
-                  const roomData = roomDoc.data();
-                  setRoomInfo({
-                    id: roomDoc.id,
-                    roomNumber: roomData.roomNumber || 'N/A',
-                    name: roomData.name || 'Room details not found'
-                  });
-                }
-              } else {
-                setRoomInfo(null);
-              }
-              
-              let bookingId = null;
-              let managerInfo: ManagerInfo | null = null;
-              if(userData.outstandingBalance > 0) {
-                const bookingsQuery = query(
-                  collection(db, "bookings"), 
-                  where("studentUid", "==", user.uid), 
-                  where("status", "==", "Unpaid"),
-                  limit(1)
-                );
-                const querySnapshot = await getDocs(bookingsQuery);
-                if (!querySnapshot.empty) {
-                    const bookingData = querySnapshot.docs[0].data();
-                    bookingId = querySnapshot.docs[0].id;
-                    const managerDocRef = doc(db, 'users', bookingData.managerUid);
-                    const managerDoc = await getDoc(managerDocRef);
-                    if (managerDoc.exists()) {
-                        const managerData = managerDoc.data();
-                        managerInfo = {
-                            hostelName: managerData.hostelName,
-                            location: managerData.location,
-                            phone: managerData.phone
-                        };
-                    }
-                }
-              }
-
-              if (userData.outstandingBalance && userData.outstandingBalance > 0) {
-                setPaymentInfo({
-                  balance: userData.outstandingBalance,
-                  dueDate: userData.dueDate ? new Date(userData.dueDate).toLocaleDateString() : 'Not specified',
-                  bookingId: bookingId,
-                  managerInfo: managerInfo,
-                });
-              } else {
-                setPaymentInfo(null);
-              }
-
-              if (userData.managerUid) {
-                  const announcementsQuery = query(
-                      collection(db, 'announcements'),
-                      where('managerUid', '==', userData.managerUid),
-                      where('status', '==', 'Published'),
-                      orderBy('createdAt', 'desc'),
-                      limit(5)
-                  );
-                  const announcementsSnapshot = await getDocs(announcementsQuery);
-                  const fetchedAnnouncements = announcementsSnapshot.docs.map(doc => {
-                      const data = doc.data();
-                      return {
-                          id: doc.id,
-                          title: data.title,
-                          content: data.content,
-                          date: data.createdAt?.toDate().toLocaleDateString() ?? 'N/A',
-                      }
-                  });
-                  setAnnouncements(fetchedAnnouncements);
-              } else {
-                setAnnouncements([]);
-              }
-            }
-          } catch (error: any) {
-              console.error("Error fetching user data:", error);
-              toast({ variant: 'destructive', title: 'Error loading dashboard', description: 'Could not fetch your data. See console for details.' });
-          } finally {
-              setIsLoading(false);
-          }
-        } else {
-          setIsLoading(false);
-        }
-      };
-
     const unsubscribe = auth.onAuthStateChanged(user => {
         if (user) {
             fetchUserData();
@@ -176,6 +191,49 @@ export default function StudentDashboardPage() {
     return () => unsubscribe();
   }, [toast]);
   
+  const handleCancelBooking = async () => {
+      const user = auth.currentUser;
+      if (!user || !roomInfo || !paymentInfo?.bookingId) {
+          toast({ variant: 'destructive', title: 'Error', description: 'Could not cancel booking. Information missing.' });
+          return;
+      }
+      if (!cancellationReason.trim()) {
+          toast({ variant: 'destructive', title: 'Reason Required', description: 'Please provide a reason for cancellation.' });
+          return;
+      }
+      setIsCancelling(true);
+      try {
+          const batch = writeBatch(db);
+
+          // 1. Update booking status
+          const bookingRef = doc(db, 'bookings', paymentInfo.bookingId);
+          batch.update(bookingRef, { status: 'Cancelled', cancellationReason });
+
+          // 2. Update user profile
+          const userRef = doc(db, 'users', user.uid);
+          batch.update(userRef, {
+              outstandingBalance: 0,
+              roomId: null,
+              roomNumber: null,
+              dueDate: null,
+          });
+
+          // 3. Update room status to available
+          const roomRef = doc(db, 'rooms', roomInfo.id);
+          batch.update(roomRef, { status: 'Available' });
+
+          await batch.commit();
+          toast({ title: 'Booking Cancelled', description: 'Your booking has been successfully cancelled.' });
+          fetchUserData(); // Refresh data
+          setCancellationReason('');
+      } catch (error) {
+          console.error("Error cancelling booking:", error);
+          toast({ variant: 'destructive', title: 'Cancellation Failed', description: 'Could not cancel your booking. See console.' });
+      } finally {
+          setIsCancelling(false);
+      }
+  };
+
 
   return (
     <>
@@ -210,7 +268,12 @@ export default function StudentDashboardPage() {
                     <p className="text-sm text-muted-foreground py-2">No room has been assigned to you yet.</p>
                 )}
               </div>
-              {!isLoading && !roomInfo && (
+              {!isLoading && roomInfo && (
+                  <Button asChild size="sm" className="mt-auto w-fit">
+                    <Link href={`/student/rooms/${roomInfo.id}`}>View Details</Link>
+                  </Button>
+              )}
+               {!isLoading && !roomInfo && (
                   <Button size="sm" asChild className="mt-auto w-fit">
                     <Link href="/student/rooms">Browse Rooms</Link>
                   </Button>
@@ -237,53 +300,80 @@ export default function StudentDashboardPage() {
                 )}
               </div>
                {!isLoading && paymentInfo && paymentInfo.balance > 0 && (
-                  <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="mt-auto w-fit">View Payment Instructions</Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle className="font-headline">Payment Instructions</DialogTitle>
-                        <DialogDescription>
-                          Please use the details below to complete your payment. The admin will confirm it shortly after.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="p-4 rounded-lg border bg-card text-card-foreground">
-                            <h4 className="font-semibold mb-2">Hostel Information</h4>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex items-center gap-3"><Building className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.hostelName || 'N/A'}</span></div>
-                                <div className="flex items-center gap-3"><MapPin className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.location || 'N/A'}</span></div>
-                                <div className="flex items-center gap-3"><Phone className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.phone || 'N/A'}</span></div>
-                            </div>
+                 <div className="flex items-center gap-2 mt-auto">
+                    <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" className="w-fit">View Payment Instructions</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle className="font-headline">Payment Instructions</DialogTitle>
+                          <DialogDescription>
+                            Please use the details below to complete your payment. The admin will confirm it shortly after.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="p-4 rounded-lg border bg-card text-card-foreground">
+                              <h4 className="font-semibold mb-2">Hostel Information</h4>
+                              <div className="space-y-2 text-sm">
+                                  <div className="flex items-center gap-3"><Building className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.hostelName || 'N/A'}</span></div>
+                                  <div className="flex items-center gap-3"><MapPin className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.location || 'N/A'}</span></div>
+                                  <div className="flex items-center gap-3"><Phone className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.phone || 'N/A'}</span></div>
+                              </div>
+                          </div>
+                          <div>
+                              <Label className="font-semibold">Choose Payment Method:</Label>
+                              <RadioGroup defaultValue="momo" className="mt-2 grid grid-cols-2 gap-4">
+                                  <div>
+                                      <RadioGroupItem value="momo" id="momo" className="peer sr-only" />
+                                      <Label htmlFor="momo" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                          Momo
+                                      </Label>
+                                  </div>
+                                   <div>
+                                      <RadioGroupItem value="cash" id="cash" className="peer sr-only" />
+                                      <Label htmlFor="cash" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                          Cash
+                                      </Label>
+                                  </div>
+                              </RadioGroup>
+                          </div>
+                           <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-md">
+                             <Handshake className="w-8 h-8 mt-1 text-yellow-600"/>
+                             <p className="text-xs">After paying via your selected method, please ensure you receive a confirmation from the hostel manager. Your dashboard will update to "Paid" once the manager confirms the transaction.</p>
+                           </div>
                         </div>
-                        <div>
-                            <Label className="font-semibold">Choose Payment Method:</Label>
-                            <RadioGroup defaultValue="momo" className="mt-2 grid grid-cols-2 gap-4">
-                                <div>
-                                    <RadioGroupItem value="momo" id="momo" className="peer sr-only" />
-                                    <Label htmlFor="momo" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                                        Momo
-                                    </Label>
-                                </div>
-                                 <div>
-                                    <RadioGroupItem value="cash" id="cash" className="peer sr-only" />
-                                    <Label htmlFor="cash" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                                        Cash
-                                    </Label>
-                                </div>
-                            </RadioGroup>
-                        </div>
-                         <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-md">
-                           <Handshake className="w-8 h-8 mt-1 text-yellow-600"/>
-                           <p className="text-xs">After paying via your selected method, please ensure you receive a confirmation from the hostel manager. Your dashboard will update to "Paid" once the manager confirms the transaction.</p>
-                         </div>
-                      </div>
-                      <DialogFooter>
-                        <Button onClick={onPaymentModalClose}>Understood, Close</Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+                        <DialogFooter>
+                          <Button onClick={onPaymentModalClose}>Understood, Close</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                    <AlertDialog>
+                       <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm" className="w-fit">Cancel Booking</Button>
+                       </AlertDialogTrigger>
+                       <AlertDialogContent>
+                          <AlertDialogHeader>
+                              <AlertDialogTitle>Cancel Your Booking?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                  This action cannot be undone. You will lose your room reservation. Please state your reason for cancellation below.
+                              </AlertDialogDescription>
+                               <Textarea 
+                                  placeholder="Type your reason here..."
+                                  className="mt-4"
+                                  value={cancellationReason}
+                                  onChange={(e) => setCancellationReason(e.target.value)}
+                               />
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                              <AlertDialogCancel>Keep Booking</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleCancelBooking} disabled={isCancelling}>
+                                  {isCancelling ? "Cancelling..." : "Confirm Cancellation"}
+                              </AlertDialogAction>
+                          </AlertDialogFooter>
+                       </AlertDialogContent>
+                    </AlertDialog>
+                 </div>
                )}
             </div>
           </CardContent>
