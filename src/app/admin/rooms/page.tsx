@@ -86,7 +86,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 type UploadedImage = { src: string; hint: string };
 
-// ---------- Image Pipeline (Simplified) ----------
+// ---------- Image Pipeline (Original Robust Version) ----------
 async function compress(file: File) {
   if (file.size < 600_000) return file;
   return imageCompression(file, {
@@ -97,44 +97,47 @@ async function compress(file: File) {
   });
 }
 
-// Simplified sequential upload function
+async function uploadFile(
+  file: File,
+  i: number,
+  roomNumber: string,
+  uid: string,
+  onProgress?: (p: number) => void
+): Promise<UploadedImage> {
+  onProgress?.(5); // Initial progress
+  const compressed = await compress(file);
+  onProgress?.(20);
+
+  const ext = compressed.type?.includes('png') ? 'png' :
+              compressed.type?.includes('webp') ? 'webp' : 'jpg';
+  
+  const filename = clean(`${i + 1}_${Date.now()}.${ext}`);
+  const path = `rooms/${uid}/${clean(roomNumber)}/${filename}`;
+  const ref = sRef(storage, path);
+  const metadata = { contentType: compressed.type || file.type || 'image/jpeg', cacheControl: 'public,max-age=31536000,immutable' };
+  
+  onProgress?.(30);
+  const snap = await uploadBytes(ref, compressed, metadata);
+  onProgress?.(80);
+  const url = await getDownloadURL(snap.ref);
+  onProgress?.(100);
+
+  return {
+    src: url,
+    hint: imageHints[i] ?? 'room interior'
+  };
+}
+
 async function uploadAll(
   files: File[],
   roomNumber: string,
   uid: string,
   onEachProgress?: (i: number, p: number) => void
 ): Promise<UploadedImage[]> {
-  const uploadedImages: UploadedImage[] = [];
-  let fileIndex = 0;
-
-  for (const file of files) {
-    const i = fileIndex;
-    onEachProgress?.(i, 5); // Initial progress
-    const compressed = await compress(file);
-    onEachProgress?.(i, 20);
-
-    const ext = compressed.type?.includes('png') ? 'png' :
-                compressed.type?.includes('webp') ? 'webp' : 'jpg';
-    
-    const filename = clean(`${i + 1}_${Date.now()}.${ext}`);
-    const path = `rooms/${uid}/${clean(roomNumber)}/${filename}`;
-    const ref = sRef(storage, path);
-    const metadata = { contentType: compressed.type || file.type || 'image/jpeg', cacheControl: 'public,max-age=31536000,immutable' };
-    
-    onEachProgress?.(i, 30);
-    const snap = await uploadBytes(ref, compressed, metadata);
-    onEachProgress?.(i, 80);
-    const url = await getDownloadURL(snap.ref);
-    onEachProgress?.(i, 100);
-
-    uploadedImages.push({
-      src: url,
-      hint: imageHints[i] ?? 'room interior'
-    });
-    fileIndex++;
-  }
-
-  return uploadedImages;
+  const uploadPromises = files.map((file, i) =>
+    uploadFile(file, i, roomNumber, uid, (p) => onEachProgress?.(i, p))
+  );
+  return Promise.all(uploadPromises);
 }
 
 
@@ -298,17 +301,16 @@ export default function AdminRoomsPage() {
       setIsFormVisible(false);
       fetchManagerAndRooms();
     } catch (error: any) {
-      console.error('UPLOAD FAIL ->', {
-        code: error?.code,
-        message: error?.message,
-        serverResponse: error?.customData?.serverResponse,
-      });
+      console.error('UPLOAD FAIL ->', error);
 
       let description = 'Could not save the room. Check console for details.';
-      if (error?.code && /unauthorized|permission-denied/i.test(error.code)) {
-        description = 'Permission error. Please check your Firebase Storage security rules to allow writes to the "rooms/" path.';
-      } else if (error?.code && /quota-exceeded/i.test(error.code)) {
-        description = 'Firebase Storage quota exceeded. Please upgrade your plan or free up space.';
+      if (typeof error === 'object' && error !== null && 'code' in error) {
+          const firebaseError = error as { code: string };
+          if (/unauthorized|permission-denied/i.test(firebaseError.code)) {
+            description = 'Permission error. Please check your Firebase Storage security rules to allow writes to the "rooms/" path.';
+          } else if (/quota-exceeded/i.test(firebaseError.code)) {
+            description = 'Firebase Storage quota exceeded. Please upgrade your plan or free up space.';
+          }
       }
       
       toast({ variant: 'destructive', title: 'Submission Error', description });
@@ -534,7 +536,7 @@ export default function AdminRoomsPage() {
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select gender" />
-                              </SelectTrigger>
+                              </Trigger>
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="Male">Male</SelectItem>
