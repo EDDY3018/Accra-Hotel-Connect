@@ -84,6 +84,9 @@ export default function HostelRoomsPage() {
         } finally {
             setIsLoading(false);
         }
+    }
+    
+    getRooms();
   }, [managerUid, hostelName]);
 
   const groupedRooms = useMemo(() => {
