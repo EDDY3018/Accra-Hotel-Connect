@@ -536,7 +536,7 @@ export default function AdminRoomsPage() {
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select gender" />
-                              </Trigger>
+                              </SelectTrigger>
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="Male">Male</SelectItem>
@@ -621,5 +621,3 @@ export default function AdminRoomsPage() {
     </>
   );
 }
-
-    
