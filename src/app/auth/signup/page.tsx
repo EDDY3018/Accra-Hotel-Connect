@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from "next/link"
@@ -23,7 +24,12 @@ const formSchema = z.object({
   studentId: z.string().regex(studentIdRegex, { message: "Invalid Student ID format." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match.",
+  path: ["confirmPassword"],
 });
+
 
 export default function SignupPage() {
   const router = useRouter();
@@ -31,7 +37,7 @@ export default function SignupPage() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { fullName: "", phone: "", studentId: "", email: "", password: "" },
+    defaultValues: { fullName: "", phone: "", studentId: "", email: "", password: "", confirmPassword: "" },
   });
   
   const { isSubmitting } = form.formState;
@@ -89,6 +95,9 @@ export default function SignupPage() {
               )} />
               <FormField control={form.control} name="password" render={({ field }) => (
                 <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+               <FormField control={form.control} name="confirmPassword" render={({ field }) => (
+                <FormItem><FormLabel>Confirm Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting ? "Creating Account..." : "Create an account"}</Button>
             </form>

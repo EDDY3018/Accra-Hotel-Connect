@@ -11,7 +11,7 @@ export default function Home() {
       <header className="px-4 lg:px-6 h-16 flex items-center bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <Link href="#" className="flex items-center justify-center" prefetch={false}>
           <HostelIcon className="h-8 w-8 text-primary" />
-          <span className="sr-only">AccraHostelConnect</span>
+          <span className="sr-only">ATU HostelConnect</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6 items-center">
           <Link href="/auth/manager-signup" className="text-sm font-medium hover:underline underline-offset-4" prefetch={false}>
@@ -31,10 +31,10 @@ export default function Home() {
             <div className="grid max-w-[1300px] mx-auto gap-4 px-4 sm:px-6 md:px-10 md:grid-cols-2 md:gap-16">
               <div className="flex flex-col justify-center space-y-4">
                 <h1 className="lg:leading-tighter text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl xl:text-[3.4rem] 2xl:text-[3.75rem] font-headline text-primary">
-                  Find Your Perfect Hostel in Accra
+                  Find Your Perfect Hostel for ATU 
                 </h1>
                 <p className="mx-auto max-w-[700px] text-foreground/80 md:text-xl">
-                  AccraHostelConnect streamlines your student living experience. Easily browse, book, and manage your stay.
+                  ATU HostelConnect streamlines your student living experience. Easily browse, book, and manage your stay.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 pt-2">
                   <Button asChild size="lg">
@@ -47,7 +47,7 @@ export default function Home() {
               </div>
               <div className="relative flex items-center justify-center">
                  <Image
-                    src="/images/ath.jpg"
+                    src="/images/main.jpeg"
                     alt="Hero Hostel"
                     width={600}
                     height={400}
@@ -107,10 +107,10 @@ export default function Home() {
         </section>
       </main>
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
-        <p className="text-xs text-muted-foreground">&copy; 2024 AccraHostelConnect. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">&copy; 2024 ATU HostelConnect. All rights reserved.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
-          <LegalModal topic="Terms of Service" appName="AccraHostelConnect" />
-          <LegalModal topic="Privacy Policy" appName="AccraHostelConnect" />
+          <LegalModal topic="Terms of Service" appName="ATU HostelConnect" />
+          <LegalModal topic="Privacy Policy" appName="ATU HostelConnect" />
         </nav>
       </footer>
     </div>

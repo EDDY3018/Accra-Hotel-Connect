@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from "next/link"
@@ -29,6 +30,10 @@ const formSchema = z.object({
   phone: z.string().regex(/^\+?[0-9\s-]{10,15}$/, { message: "Please enter a valid phone number." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match.",
+  path: ["confirmPassword"],
 });
 
 export default function ManagerSignupPage() {
@@ -43,6 +48,7 @@ export default function ManagerSignupPage() {
       phone: "",
       email: "",
       password: "",
+      confirmPassword: "",
     },
   });
 
@@ -159,6 +165,19 @@ export default function ManagerSignupPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm Password</FormLabel>
                   <FormControl>
                     <Input type="password" {...field} />
                   </FormControl>
