@@ -10,7 +10,7 @@ import * as z from 'zod';
 import { auth, db, storage } from '@/lib/firebase';
 import {
   ref as sRef,
-  uploadBytes,
+  uploadBytesResumable,
   getDownloadURL,
 } from 'firebase/storage';
 import {
@@ -86,58 +86,64 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 type UploadedImage = { src: string; hint: string };
 
-// ---------- Image Pipeline (Original Robust Version) ----------
-async function compress(file: File) {
-  if (file.size < 600_000) return file;
-  return imageCompression(file, {
-    maxWidthOrHeight: 960,
-    maxSizeMB: 0.22,
-    initialQuality: 0.66,
-    useWebWorker: true,
+
+// ---------- Resumable Upload Pipeline ----------
+async function uploadResumable(
+  file: File,
+  path: string,
+  onProgress?: (pct: number) => void
+): Promise<string> {
+  const ref = sRef(storage, path);
+  const metadata = {
+    contentType: file.type || 'image/jpeg',
+    cacheControl: 'public,max-age=31536000,immutable',
+  };
+
+  return new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(ref, file, metadata);
+
+    task.on(
+      'state_changed',
+      snap => {
+        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        onProgress?.(pct);
+      },
+      err => {
+        // Surface exact Firebase Storage error codes (helps a lot)
+        // examples: 'storage/unauthorized', 'storage/retry-limit-exceeded', 'storage/canceled'
+        reject(err);
+      },
+      async () => {
+        const url = await getDownloadURL(task.snapshot.ref);
+        resolve(url);
+      }
+    );
   });
 }
 
-async function uploadFile(
-  file: File,
-  i: number,
-  roomNumber: string,
-  uid: string,
-  onProgress?: (p: number) => void
-): Promise<UploadedImage> {
-  onProgress?.(5); // Initial progress
-  const compressed = await compress(file);
-  onProgress?.(20);
-
-  const ext = compressed.type?.includes('png') ? 'png' :
-              compressed.type?.includes('webp') ? 'webp' : 'jpg';
-  
-  const filename = clean(`${i + 1}_${Date.now()}.${ext}`);
-  const path = `rooms/${uid}/${clean(roomNumber)}/${filename}`;
-  const ref = sRef(storage, path);
-  const metadata = { contentType: compressed.type || file.type || 'image/jpeg', cacheControl: 'public,max-age=31536000,immutable' };
-  
-  onProgress?.(30);
-  const snap = await uploadBytes(ref, compressed, metadata);
-  onProgress?.(80);
-  const url = await getDownloadURL(snap.ref);
-  onProgress?.(100);
-
-  return {
-    src: url,
-    hint: imageHints[i] ?? 'room interior'
-  };
-}
-
-async function uploadAll(
+async function uploadAllSerial(
   files: File[],
-  roomNumber: string,
   uid: string,
+  roomNumber: string,
   onEachProgress?: (i: number, p: number) => void
-): Promise<UploadedImage[]> {
-  const uploadPromises = files.map((file, i) =>
-    uploadFile(file, i, roomNumber, uid, (p) => onEachProgress?.(i, p))
-  );
-  return Promise.all(uploadPromises);
+) {
+  const urls: { src: string; hint: string }[] = [];
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const ext = f.type.includes('png') ? 'png' : f.type.includes('webp') ? 'webp' : 'jpg';
+    const filename = `${i + 1}_${Date.now()}.${ext}`;
+    const path = `rooms/${uid}/${clean(roomNumber)}/${filename}`;
+    
+    const compressedFile = await imageCompression(f, {
+        maxWidthOrHeight: 1280,
+        maxSizeMB: 0.5,
+        useWebWorker: true,
+    });
+
+    const src = await uploadResumable(compressedFile, path, p => onEachProgress?.(i, p));
+    urls.push({ src, hint: imageHints[i] ?? 'room interior' });
+  }
+  return urls;
 }
 
 
@@ -156,9 +162,9 @@ export default function AdminRoomsPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       roomNumber: '',
-      price: '' as unknown as number,     // string default to avoid uncontrolled warning
-      occupancy: '' as unknown as string, // string default to avoid uncontrolled warning
-      gender: '' as unknown as string, // string default to avoid uncontrolled warning
+      price: '' as unknown as number,
+      occupancy: '' as unknown as string,
+      gender: '' as unknown as string,
       description: '',
       amenities: [],
       images: [],
@@ -262,10 +268,10 @@ export default function AdminRoomsPage() {
     }
 
     try {
-      const imageUrls = await uploadAll(
+      const imageUrls = await uploadAllSerial(
         values.images,
-        values.roomNumber,
         user.uid,
+        values.roomNumber,
         (i, p) => {
           setUploadProgresses((prev) => {
             const arr = [...prev];
@@ -287,7 +293,7 @@ export default function AdminRoomsPage() {
         gender: values.gender,
         description: values.description,
         amenities: values.amenities || [],
-        images: imageUrls, // [{src, hint}]
+        images: imageUrls,
         status: 'Available',
         createdAt: serverTimestamp(),
       };
@@ -301,19 +307,24 @@ export default function AdminRoomsPage() {
       setIsFormVisible(false);
       fetchManagerAndRooms();
     } catch (error: any) {
-      console.error('UPLOAD FAIL ->', error);
-
-      let description = 'Could not save the room. Check console for details.';
-      if (typeof error === 'object' && error !== null && 'code' in error) {
-          const firebaseError = error as { code: string };
-          if (/unauthorized|permission-denied/i.test(firebaseError.code)) {
-            description = 'Permission error. Please check your Firebase Storage security rules to allow writes to the "rooms/" path.';
-          } else if (/quota-exceeded/i.test(firebaseError.code)) {
-            description = 'Firebase Storage quota exceeded. Please upgrade your plan or free up space.';
+        console.error('UPLOAD FAIL ->', error, error?.code, error?.customData);
+        let description = 'Could not save the room. Check the console for details.';
+        if (error.code) {
+          switch (error.code) {
+            case 'storage/unauthorized':
+              description = "Permission Denied. Please ensure you have the correct Firebase Storage rules and App Check is configured.";
+              break;
+            case 'storage/retry-limit-exceeded':
+              description = "Upload failed due to a network error. Please check your connection and try again.";
+              break;
+            case 'storage/quota-exceeded':
+              description = "You've exceeded your Firebase Storage quota. Please upgrade your plan or free up space.";
+              break;
+            default:
+              description = `An unexpected storage error occurred: ${error.code}`;
           }
-      }
-      
-      toast({ variant: 'destructive', title: 'Submission Error', description });
+        }
+        toast({ variant: 'destructive', title: 'Upload Error', description, duration: 9000 });
     }
   }
 
