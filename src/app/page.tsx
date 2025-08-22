@@ -41,7 +41,7 @@ export default function Home() {
                     <Link href="/auth/signup" prefetch={false}>Get Started</Link>
                   </Button>
                   <Button asChild variant="secondary" size="lg">
-                     <Link href="/student/rooms" prefetch={false}>Browse Rooms</Link>
+                     <Link href="/student/rooms" prefetch={false}>Browse Hostels</Link>
                   </Button>
                 </div>
               </div>
