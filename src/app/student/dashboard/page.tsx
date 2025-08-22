@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bell, FileWarning, BedDouble, Building, MapPin, Phone, Handshake, XCircle } from "lucide-react";
+import { Bell, FileWarning, BedDouble, Building, MapPin, Phone, Handshake, XCircle, ChevronRight } from "lucide-react";
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, writeBatch, serverTimestamp, setDoc, collectionGroup } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -62,6 +62,11 @@ interface PaymentInfo {
   managerUid: string | null;
 }
 
+interface Hostel {
+    id: string;
+    name: string;
+}
+
 export default function StudentDashboardPage() {
   const { toast } = useToast();
   const [userName, setUserName] = useState('');
@@ -73,6 +78,7 @@ export default function StudentDashboardPage() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
+  const [hostels, setHostels] = useState<Hostel[]>([]);
   
   const fetchUserData = async () => {
       setIsLoading(true);
@@ -189,6 +195,23 @@ export default function StudentDashboardPage() {
       }
     };
     
+  const fetchHostels = async () => {
+        const roomsQuery = query(collection(db, 'rooms'), where('status', '==', 'Available'));
+        const roomSnapshot = await getDocs(roomsQuery);
+        const hostelsMap = new Map<string, Hostel>();
+        roomSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const managerUid = data.managerUid;
+            if (!hostelsMap.has(managerUid)) {
+                hostelsMap.set(managerUid, {
+                    id: managerUid,
+                    name: data.hostelName || 'Unknown Hostel',
+                });
+            }
+        });
+        setHostels(Array.from(hostelsMap.values()));
+  }
+
   const onPaymentModalClose = () => {
     setIsPaymentModalOpen(false);
     toast({
@@ -201,6 +224,7 @@ export default function StudentDashboardPage() {
     const unsubscribe = auth.onAuthStateChanged(user => {
         if (user) {
             fetchUserData();
+            fetchHostels();
         } else {
             setIsLoading(false);
         }
@@ -284,145 +308,143 @@ export default function StudentDashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <div className="lg:col-span-2 grid gap-6 sm:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-3 mb-2">
-                  <BedDouble className="w-6 h-6 text-primary" />
-                  <h3 className="font-semibold">Your Room</h3>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-7 w-20" />
-                    <Skeleton className="h-4 w-32" />
-                  </div>
-                ) : roomInfo ? (
-                  <>
-                    <p className="text-2xl font-bold">{roomInfo.roomNumber}</p>
-                    <p className="text-sm text-muted-foreground">{roomInfo.name}</p>
-                  </>
-                ) : (
-                    <p className="text-sm text-muted-foreground py-2">No room has been assigned to you yet.</p>
-                )}
-              </CardContent>
-              <CardFooter>
-                 {!isLoading && roomInfo && (
-                    <Button asChild size="sm" className="w-fit">
-                      <Link href={`/student/rooms/${roomInfo.id}`}>View Details</Link>
-                    </Button>
-                )}
-                 {!isLoading && !roomInfo && (
-                    <Button size="sm" asChild className="w-fit">
-                      <Link href="/student/rooms">Browse Rooms</Link>
-                    </Button>
-                )}
-              </CardFooter>
-            </Card>
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-3 mb-2">
-                  <FileWarning className="w-6 h-6 text-destructive" />
-                  <h3 className="font-semibold">Outstanding Balance</h3>
-                </div>
-              </CardHeader>
-               <CardContent>
-                {isLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-7 w-28" />
-                    <Skeleton className="h-4 w-24" />
-                  </div>
-                ) : paymentInfo && paymentInfo.balance > 0 ? (
-                  <>
-                    <p className="text-2xl font-bold">GHS {paymentInfo.balance.toFixed(2)}</p>
-                    <p className="text-sm text-muted-foreground">Due: {paymentInfo.dueDate}</p>
-                    <p className="text-xs text-muted-foreground/80 mt-1">Payment is due one month after booking date.</p>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground py-2">You have no outstanding balance. Great job!</p>
-                )}
-              </CardContent>
-               <CardFooter className="flex flex-col items-start gap-2">
-                 {!isLoading && paymentInfo && paymentInfo.balance > 0 && (
-                   <>
-                    <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" className="w-full">View Payment Instructions</Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle className="font-headline">Payment Instructions</DialogTitle>
-                          <DialogDescription>
-                            Please use the details below to complete your payment. The admin will confirm it shortly after.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div className="p-4 rounded-lg border bg-card text-card-foreground">
-                              <h4 className="font-semibold mb-2">Hostel Information</h4>
-                              <div className="space-y-2 text-sm">
-                                  <div className="flex items-center gap-3"><Building className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.hostelName || 'N/A'}</span></div>
-                                  <div className="flex items-center gap-3"><MapPin className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.location || 'N/A'}</span></div>
-                                  <div className="flex items-center gap-3"><Phone className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.phone || 'N/A'}</span></div>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <BedDouble className="w-6 h-6 text-primary" />
+              <h3 className="font-semibold">Your Room</h3>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-7 w-20" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            ) : roomInfo ? (
+              <>
+                <p className="text-2xl font-bold">{roomInfo.roomNumber}</p>
+                <p className="text-sm text-muted-foreground">{roomInfo.name}</p>
+              </>
+            ) : (
+                <p className="text-sm text-muted-foreground py-2">No room has been assigned to you yet.</p>
+            )}
+          </CardContent>
+          <CardFooter>
+             {!isLoading && roomInfo && (
+                <Button asChild size="sm" className="w-fit">
+                  <Link href={`/student/rooms/${roomInfo.id}`}>View Details</Link>
+                </Button>
+            )}
+             {!isLoading && !roomInfo && (
+                <Button size="sm" asChild className="w-fit">
+                  <Link href="/student/rooms">Browse Hostels</Link>
+                </Button>
+            )}
+          </CardFooter>
+        </Card>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <FileWarning className="w-6 h-6 text-destructive" />
+              <h3 className="font-semibold">Outstanding Balance</h3>
+            </div>
+          </CardHeader>
+           <CardContent>
+            {isLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-7 w-28" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ) : paymentInfo && paymentInfo.balance > 0 ? (
+              <>
+                <p className="text-2xl font-bold">GHS {paymentInfo.balance.toFixed(2)}</p>
+                <p className="text-sm text-muted-foreground">Due: {paymentInfo.dueDate}</p>
+                <p className="text-xs text-muted-foreground/80 mt-1">Payment is due one month after booking date.</p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground py-2">You have no outstanding balance. Great job!</p>
+            )}
+          </CardContent>
+           <CardFooter className="flex flex-col items-start gap-2">
+             {!isLoading && paymentInfo && paymentInfo.balance > 0 && (
+               <>
+                <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="w-full">View Payment Instructions</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="font-headline">Payment Instructions</DialogTitle>
+                      <DialogDescription>
+                        Please use the details below to complete your payment. The admin will confirm it shortly after.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="p-4 rounded-lg border bg-card text-card-foreground">
+                          <h4 className="font-semibold mb-2">Hostel Information</h4>
+                          <div className="space-y-2 text-sm">
+                              <div className="flex items-center gap-3"><Building className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.hostelName || 'N/A'}</span></div>
+                              <div className="flex items-center gap-3"><MapPin className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.location || 'N/A'}</span></div>
+                              <div className="flex items-center gap-3"><Phone className="w-4 h-4 text-muted-foreground"/><span>{paymentInfo.managerInfo?.phone || 'N/A'}</span></div>
+                          </div>
+                      </div>
+                      <div>
+                          <Label className="font-semibold">Choose Payment Method:</Label>
+                          <RadioGroup defaultValue="momo" className="mt-2 grid grid-cols-2 gap-4">
+                              <div>
+                                  <RadioGroupItem value="momo" id="momo" className="peer sr-only" />
+                                  <Label htmlFor="momo" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                      Momo
+                                  </Label>
                               </div>
-                          </div>
-                          <div>
-                              <Label className="font-semibold">Choose Payment Method:</Label>
-                              <RadioGroup defaultValue="momo" className="mt-2 grid grid-cols-2 gap-4">
-                                  <div>
-                                      <RadioGroupItem value="momo" id="momo" className="peer sr-only" />
-                                      <Label htmlFor="momo" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                                          Momo
-                                      </Label>
-                                  </div>
-                                   <div>
-                                      <RadioGroupItem value="cash" id="cash" className="peer sr-only" />
-                                      <Label htmlFor="cash" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                                          Cash
-                                      </Label>
-                                  </div>
-                              </RadioGroup>
-                          </div>
-                           <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-md">
-                             <Handshake className="w-8 h-8 mt-1 text-yellow-600"/>
-                             <p className="text-xs">After paying via your selected method, please ensure you receive a confirmation from the hostel manager. Your dashboard will update to "Paid" once the manager confirms the transaction.</p>
-                           </div>
-                        </div>
-                        <DialogFooter>
-                          <Button onClick={onPaymentModalClose}>Understood, Close</Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                    <AlertDialog>
-                       <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm" className="w-full">Cancel Booking</Button>
-                       </AlertDialogTrigger>
-                       <AlertDialogContent>
-                          <AlertDialogHeader>
-                              <AlertDialogTitle>Cancel Your Booking?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                  This action cannot be undone. You will lose your room reservation. Please state your reason for cancellation below.
-                              </AlertDialogDescription>
-                               <Textarea 
-                                  placeholder="Type your reason here..."
-                                  className="mt-4"
-                                  value={cancellationReason}
-                                  onChange={(e) => setCancellationReason(e.target.value)}
-                               />
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                              <AlertDialogCancel>Keep Booking</AlertDialogCancel>
-                              <AlertDialogAction onClick={handleCancelBooking} disabled={isCancelling}>
-                                  {isCancelling ? "Cancelling..." : "Confirm Cancellation"}
-                              </AlertDialogAction>
-                          </AlertDialogFooter>
-                       </AlertDialogContent>
-                    </AlertDialog>
-                   </>
-               )}
-              </CardFooter>
-            </Card>
-        </div>
+                               <div>
+                                  <RadioGroupItem value="cash" id="cash" className="peer sr-only" />
+                                  <Label htmlFor="cash" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                      Cash
+                                  </Label>
+                              </div>
+                          </RadioGroup>
+                      </div>
+                       <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-md">
+                         <Handshake className="w-8 h-8 mt-1 text-yellow-600"/>
+                         <p className="text-xs">After paying via your selected method, please ensure you receive a confirmation from the hostel manager. Your dashboard will update to "Paid" once the manager confirms the transaction.</p>
+                       </div>
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={onPaymentModalClose}>Understood, Close</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+                <AlertDialog>
+                   <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm" className="w-full">Cancel Booking</Button>
+                   </AlertDialogTrigger>
+                   <AlertDialogContent>
+                      <AlertDialogHeader>
+                          <AlertDialogTitle>Cancel Your Booking?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                              This action cannot be undone. You will lose your room reservation. Please state your reason for cancellation below.
+                          </AlertDialogDescription>
+                           <Textarea 
+                              placeholder="Type your reason here..."
+                              className="mt-4"
+                              value={cancellationReason}
+                              onChange={(e) => setCancellationReason(e.target.value)}
+                           />
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                          <AlertDialogCancel>Keep Booking</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleCancelBooking} disabled={isCancelling}>
+                              {isCancelling ? "Cancelling..." : "Confirm Cancellation"}
+                          </AlertDialogAction>
+                      </AlertDialogFooter>
+                   </AlertDialogContent>
+                </AlertDialog>
+               </>
+           )}
+          </CardFooter>
+        </Card>
         <Card>
           <CardHeader className="flex flex-row items-start justify-between pb-2">
             <div>
@@ -466,8 +488,37 @@ export default function StudentDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <div className="mt-8">
+        <Card>
+            <CardHeader>
+                <CardTitle className="font-headline">Available Hostels</CardTitle>
+                <CardDescription>Explore other hostels available on the platform.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? (
+                    <div className="space-y-2">
+                        <Skeleton className="h-8 w-full" />
+                        <Skeleton className="h-8 w-full" />
+                        <Skeleton className="h-8 w-full" />
+                    </div>
+                ) : hostels.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No other hostels are available right now.</p>
+                ) : (
+                    <ul className="divide-y">
+                        {hostels.map(hostel => (
+                            <li key={hostel.id}>
+                                <Link href={`/student/rooms/hostel/${hostel.id}`} className="flex items-center justify-between p-3 -m-3 rounded-lg hover:bg-muted">
+                                    <span className="font-medium">{hostel.name}</span>
+                                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </CardContent>
+        </Card>
+      </div>
     </>
   );
 }
-
-    
