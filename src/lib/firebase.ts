@@ -20,11 +20,15 @@ const firebaseConfig = {
 // Initialize Database connection
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-if (typeof window !== 'undefined') {
-  initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!),
-    isTokenAutoRefreshEnabled: true,
-  });
+if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (error) {
+    console.error("Failed to initialize App Check:", error);
+  }
 }
 
 const auth = getAuth(app);

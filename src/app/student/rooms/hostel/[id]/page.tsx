@@ -4,7 +4,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from "next/link"
 import Image from "next/image"
-import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -30,9 +29,8 @@ interface GroupedRooms {
     [occupancy: string]: Room[];
 }
 
-export default function HostelRoomsPage() {
-  const params = useParams();
-  const managerUid = params.id as string;
+export default function HostelRoomsPage({ params }: { params: { id: string } }) {
+  const { id: managerUid } = params;
 
   const [allRooms, setAllRooms] = useState<Room[]>([]);
   const [hostelName, setHostelName] = useState('');
@@ -252,5 +250,3 @@ export default function HostelRoomsPage() {
     </>
   )
 }
-
-    

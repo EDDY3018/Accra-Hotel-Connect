@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -79,10 +79,9 @@ type RoomDetails = {
   managerUid: string;
 };
 
-export default function RoomDetailPage() {
+export default function RoomDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const params = useParams();
-  const id = params.id as string;
+  const { id } = params;
   const { toast } = useToast();
   const [roomDetails, setRoomDetails] = useState<RoomDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -385,5 +384,3 @@ export default function RoomDetailPage() {
     </div>
   )
 }
-
-    
