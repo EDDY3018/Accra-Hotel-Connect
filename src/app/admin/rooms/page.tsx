@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -62,12 +63,6 @@ const imageHints = ['room angle one', 'room angle two', 'room angle three', 'bat
 const clean = (s: string) =>
   s.normalize('NFKD').replace(/[^A-Za-z0-9._-]+/g, '_').trim();
 
-// conservative concurrency for Studio preview
-const CONCURRENCY =
-  typeof navigator !== 'undefined' &&
-  // @ts-expect-error: non-standard API
-  (navigator?.connection?.downlink ?? 0) >= 5 ? 2 : 1;
-
 // Safer schema (no uncontrolled warnings)
 const formSchema = z.object({
   roomNumber: z.string().min(1, 'Room number is required.'),
@@ -90,9 +85,8 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 type UploadedImage = { src: string; hint: string };
 
-// ---------- Image Pipeline (single-request only) ----------
+// ---------- Image Pipeline (Simplified) ----------
 async function compress(file: File) {
-  // Faster in Studio / low bandwidth
   if (file.size < 600_000) return file;
   return imageCompression(file, {
     maxWidthOrHeight: 960,
@@ -102,66 +96,44 @@ async function compress(file: File) {
   });
 }
 
-async function uploadOneBytesOnly(
-  file: File,
-  i: number,
-  roomNumber: string,
-  uid: string,
-  onProgress?: (p: number) => void
-): Promise<UploadedImage> {
-  const t0 = performance.now();
-  const compressed = await compress(file);
-
-  // simulate progress for single-request upload
-  onProgress?.(10);
-
-  const ext =
-    compressed.type?.includes('png') ? 'png' :
-    compressed.type?.includes('webp') ? 'webp' : 'jpg';
-
-  const filename = clean(`${i + 1}_${Date.now()}.${ext}`);
-  const path = `rooms/${uid}/${clean(roomNumber)}/${filename}`;
-  const ref = sRef(storage, path);
-  const metadata = { contentType: compressed.type || file.type || 'image/jpeg', cacheControl: 'public,max-age=31536000,immutable' };
-
-  const snap = await uploadBytes(ref, compressed, metadata);
-  onProgress?.(90);
-  const url = await getDownloadURL(snap.ref);
-  onProgress?.(100);
-
-  console.log(`img ${i + 1} uploadBytes → ${(performance.now() - t0).toFixed(0)}ms`);
-  return { src: url, hint: imageHints[i] ?? 'room interior' };
-}
-
+// Simplified sequential upload function
 async function uploadAll(
   files: File[],
   roomNumber: string,
   uid: string,
-  onEachProgress?: (i:number,p:number)=>void
+  onEachProgress?: (i: number, p: number) => void
 ): Promise<UploadedImage[]> {
-  const results: UploadedImage[] = new Array(files.length);
-  let errorCaptured: any = null;
+  const uploadedImages: UploadedImage[] = [];
 
-  const idxs = files.map((_, i) => i);
-  const groups: number[][] = Array.from({ length: CONCURRENCY }, () => []);
-  idxs.forEach((idx, k) => groups[k % CONCURRENCY]!.push(idx));
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    onEachProgress?.(i, 5); // Initial progress
+    const compressed = await compress(file);
+    onEachProgress?.(i, 20);
 
-  async function worker(myIdxs: number[]) {
-    for (const i of myIdxs) {
-      if (errorCaptured) return;
-      try {
-        results[i] = await uploadOneBytesOnly(files[i], i, roomNumber, uid, (p) => onEachProgress?.(i, p));
-      } catch (e) {
-        errorCaptured = e;
-        return;
-      }
-    }
+    const ext = compressed.type?.includes('png') ? 'png' :
+                compressed.type?.includes('webp') ? 'webp' : 'jpg';
+    
+    const filename = clean(`${i + 1}_${Date.now()}.${ext}`);
+    const path = `rooms/${uid}/${clean(roomNumber)}/${filename}`;
+    const ref = sRef(storage, path);
+    const metadata = { contentType: compressed.type || file.type || 'image/jpeg', cacheControl: 'public,max-age=31536000,immutable' };
+    
+    onEachProgress?.(i, 30);
+    const snap = await uploadBytes(ref, compressed, metadata);
+    onEachProgress?.(i, 80);
+    const url = await getDownloadURL(snap.ref);
+    onEachProgress?.(i, 100);
+
+    uploadedImages.push({
+      src: url,
+      hint: imageHints[i] ?? 'room interior'
+    });
   }
 
-  await Promise.all(groups.map((g) => worker(g)));
-  if (errorCaptured) throw errorCaptured;
-  return results;
+  return uploadedImages;
 }
+
 
 // ---------- Page ----------
 export default function AdminRoomsPage() {
@@ -282,8 +254,6 @@ export default function AdminRoomsPage() {
       return;
     }
 
-    console.log('SUBMIT rooms payload →', values);
-
     try {
       const imageUrls = await uploadAll(
         values.images,
@@ -335,10 +305,7 @@ export default function AdminRoomsPage() {
           )) {
         description = 'Permission/App Check issue. Verify Storage/Firestore rules and App Check is properly initialized.';
       }
-      if (/stalled|timed out|timeout/i.test(String(error?.message))) {
-        description = 'Network stalled. Using single-request uploads—try smaller images if it persists.';
-      }
-
+      
       toast({ variant: 'destructive', title: 'Submission Error', description });
     }
   }
