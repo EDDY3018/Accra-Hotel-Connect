@@ -22,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const navItems = [
     { href: "/student/dashboard", icon: Home, label: "Dashboard" },
-    { href: "/student/rooms", icon: BedDouble, label: "Rooms" },
+    { href: "/student/rooms", icon: BedDouble, label: "Hostels" },
     { href: "/student/payments", icon: Wallet, label: "Payments" },
     { href: "/student/support", icon: LifeBuoy, label: "Support" },
 ];
