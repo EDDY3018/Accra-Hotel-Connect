@@ -23,6 +23,7 @@ interface Room {
     status: 'Available' | 'Occupied';
     amenities: string[];
     occupancy: string;
+    gender: 'Male' | 'Female' | 'Unisex';
 }
 
 interface GroupedRooms {
@@ -38,6 +39,8 @@ export default function HostelRoomsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<{[key: string]: boolean}>({});
   const [selectedOccupancy, setSelectedOccupancy] = useState('all');
+  const [selectedGender, setSelectedGender] = useState('all');
+
 
   const toggleCategory = (key: string) => {
     setExpandedCategories(prev => ({ ...prev, [key]: !prev[key] }));
@@ -74,6 +77,7 @@ export default function HostelRoomsPage() {
                     status: data.status || "Available",
                     amenities: data.amenities || [],
                     occupancy: data.occupancy || 'Other',
+                    gender: data.gender || 'Unisex',
                 } as Room;
             });
             setAllRooms(fetchedRooms);
@@ -90,25 +94,31 @@ export default function HostelRoomsPage() {
   }, [managerUid, hostelName]);
 
   const groupedRooms = useMemo(() => {
-    const roomsToGroup = selectedOccupancy === 'all'
-        ? allRooms
-        : allRooms.filter(room => room.occupancy === selectedOccupancy);
+    let filteredRooms = allRooms;
+
+    if (selectedOccupancy !== 'all') {
+        filteredRooms = filteredRooms.filter(room => room.occupancy === selectedOccupancy);
+    }
+    
+    if (selectedGender !== 'all') {
+        filteredRooms = filteredRooms.filter(room => room.gender === selectedGender);
+    }
 
     const roomsByOccupancy: GroupedRooms = {};
-    roomsToGroup.forEach(room => {
+    filteredRooms.forEach(room => {
         if (!roomsByOccupancy[room.occupancy]) {
             roomsByOccupancy[room.occupancy] = [];
         }
         roomsByOccupancy[room.occupancy].push(room);
     });
-    // Sort keys (e.g., "1 in a room", "2 in a room")
+    
     const sortedKeys = Object.keys(roomsByOccupancy).sort();
     const sortedGroupedRooms: GroupedRooms = {};
     for (const key of sortedKeys) {
         sortedGroupedRooms[key] = roomsByOccupancy[key];
     }
     return sortedGroupedRooms;
-  }, [allRooms, selectedOccupancy]);
+  }, [allRooms, selectedOccupancy, selectedGender]);
   
   const occupancyOptions = useMemo(() => {
       const uniqueOccupancies = new Set(allRooms.map(room => room.occupancy));
@@ -126,18 +136,29 @@ export default function HostelRoomsPage() {
         <Card className="mb-8">
             <CardHeader className='flex-row items-center gap-3 space-y-0'>
                 <Filter className="w-5 h-5 text-muted-foreground" />
-                <CardTitle className="font-headline text-lg">Filter by room type</CardTitle>
+                <CardTitle className="font-headline text-lg">Filter Rooms</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="grid sm:grid-cols-2 gap-4">
                 <Select value={selectedOccupancy} onValueChange={setSelectedOccupancy} disabled={isLoading || occupancyOptions.length === 0}>
-                    <SelectTrigger className="w-full md:w-72">
-                        <SelectValue placeholder="Select a room type" />
+                    <SelectTrigger>
+                        <SelectValue placeholder="Filter by room type..." />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Room Types</SelectItem>
                         {occupancyOptions.map(option => (
                            <SelectItem key={option} value={option}>{option}</SelectItem>
                         ))}
+                    </SelectContent>
+                </Select>
+                 <Select value={selectedGender} onValueChange={setSelectedGender} disabled={isLoading}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Filter by gender..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Genders</SelectItem>
+                        <SelectItem value="Male">Boys</SelectItem>
+                        <SelectItem value="Female">Girls</SelectItem>
+                        <SelectItem value="Unisex">Unisex</SelectItem>
                     </SelectContent>
                 </Select>
             </CardContent>
@@ -231,3 +252,5 @@ export default function HostelRoomsPage() {
     </>
   )
 }
+
+    

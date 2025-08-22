@@ -71,6 +71,7 @@ const formSchema = z.object({
     z.number({ required_error: 'Price is required.' }).positive('Price must be positive.')
   ),
   occupancy: z.string({ required_error: 'Please select an occupancy level.' }),
+  gender: z.string({ required_error: 'Please select a gender.' }),
   description: z.string().min(10, 'Description must be at least 10 characters long.'),
   amenities: z.array(z.string()).optional(),
   images: z
@@ -154,6 +155,7 @@ export default function AdminRoomsPage() {
       roomNumber: '',
       price: '' as unknown as number,     // string default to avoid uncontrolled warning
       occupancy: '' as unknown as string, // string default to avoid uncontrolled warning
+      gender: '' as unknown as string, // string default to avoid uncontrolled warning
       description: '',
       amenities: [],
       images: [],
@@ -279,6 +281,7 @@ export default function AdminRoomsPage() {
         roomNumber: values.roomNumber,
         price: values.price,
         occupancy: values.occupancy,
+        gender: values.gender,
         description: values.description,
         amenities: values.amenities || [],
         images: imageUrls, // [{src, hint}]
@@ -495,31 +498,55 @@ export default function AdminRoomsPage() {
                     />
                   </div>
 
-                  <FormField
-                    control={form.control}
-                    name="occupancy"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Room Occupancy</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select occupancy" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="1 in a room">1 in a room</SelectItem>
-                            <SelectItem value="2 in a room">2 in a room</SelectItem>
-                            <SelectItem value="3 in a room">3 in a room</SelectItem>
-                            <SelectItem value="4 in a room">4 in a room</SelectItem>
-                            <SelectItem value="5 in a room">5 in a room</SelectItem>
-                            <SelectItem value="6 in a room">6 in a room</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="occupancy"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Room Occupancy</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select occupancy" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="1 in a room">1 in a room</SelectItem>
+                              <SelectItem value="2 in a room">2 in a room</SelectItem>
+                              <SelectItem value="3 in a room">3 in a room</SelectItem>
+                              <SelectItem value="4 in a room">4 in a room</SelectItem>
+                              <SelectItem value="5 in a room">5 in a room</SelectItem>
+                              <SelectItem value="6 in a room">6 in a room</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                     <FormField
+                      control={form.control}
+                      name="gender"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Gender</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select gender" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Male">Male</SelectItem>
+                              <SelectItem value="Female">Female</SelectItem>
+                              <SelectItem value="Unisex">Unisex</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <FormField
                     control={form.control}
@@ -592,3 +619,5 @@ export default function AdminRoomsPage() {
     </>
   );
 }
+
+    
