@@ -104,9 +104,10 @@ async function uploadAll(
   onEachProgress?: (i: number, p: number) => void
 ): Promise<UploadedImage[]> {
   const uploadedImages: UploadedImage[] = [];
+  let fileIndex = 0;
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
+  for (const file of files) {
+    const i = fileIndex;
     onEachProgress?.(i, 5); // Initial progress
     const compressed = await compress(file);
     onEachProgress?.(i, 20);
@@ -129,6 +130,7 @@ async function uploadAll(
       src: url,
       hint: imageHints[i] ?? 'room interior'
     });
+    fileIndex++;
   }
 
   return uploadedImages;
@@ -300,10 +302,10 @@ export default function AdminRoomsPage() {
       });
 
       let description = 'Could not save the room. Check console for details.';
-      if (/unauthorized|permission|PERMISSION|denied|403|quota|appcheck/i.test(
-            `${error?.code} ${error?.message} ${error?.customData?.serverResponse || ''}`
-          )) {
-        description = 'Permission/App Check issue. Verify Storage/Firestore rules and App Check is properly initialized.';
+      if (error?.code && /unauthorized|permission-denied/i.test(error.code)) {
+        description = 'Permission error. Please check your Firebase Storage security rules to allow writes to the "rooms/" path.';
+      } else if (error?.code && /quota-exceeded/i.test(error.code)) {
+        description = 'Firebase Storage quota exceeded. Please upgrade your plan or free up space.';
       }
       
       toast({ variant: 'destructive', title: 'Submission Error', description });
