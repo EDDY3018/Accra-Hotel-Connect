@@ -85,20 +85,20 @@ type FormValues = z.infer<typeof formSchema>;
 type UploadedImage = { src: string; hint: string };
 
 
-// ---------- Resumable Upload Pipeline ----------
+// ---------- Resumable Upload Helper ----------
 async function uploadResumable(
   file: File,
   path: string,
   onProgress?: (pct: number) => void
 ): Promise<string> {
-  const ref = sRef(storage, path);
+  const storageRef = sRef(storage, path);
   const metadata = {
     contentType: file.type || 'image/jpeg',
     cacheControl: 'public,max-age=31536000,immutable',
   };
 
   return new Promise((resolve, reject) => {
-    const task = uploadBytesResumable(ref, file, metadata);
+    const task = uploadBytesResumable(storageRef, file, metadata);
 
     task.on(
       'state_changed',
@@ -107,35 +107,20 @@ async function uploadResumable(
         onProgress?.(pct);
       },
       err => {
-        // Surface exact Firebase Storage error codes (helps a lot)
-        // examples: 'storage/unauthorized', 'storage/retry-limit-exceeded', 'storage/canceled'
-        reject(err);
+        console.error("Upload error in helper:", err.code, err.message);
+        reject(err); // Reject the promise on error
       },
       async () => {
-        const url = await getDownloadURL(task.snapshot.ref);
-        resolve(url);
+        try {
+          const url = await getDownloadURL(task.snapshot.ref);
+          resolve(url);
+        } catch (error) {
+           console.error("Error getting download URL:", error);
+           reject(error);
+        }
       }
     );
   });
-}
-
-async function uploadAllSerial(
-  files: File[],
-  uid: string,
-  roomNumber: string,
-  onEachProgress?: (i: number, p: number) => void
-) {
-  const urls: { src: string; hint: string }[] = [];
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    const ext = f.type.includes('png') ? 'png' : f.type.includes('webp') ? 'webp' : 'jpg';
-    const filename = `${i + 1}_${Date.now()}.${ext}`;
-    const path = `rooms/${uid}/${clean(roomNumber)}/${filename}`;
-    
-    const src = await uploadResumable(f, path, p => onEachProgress?.(i, p));
-    urls.push({ src, hint: imageHints[i] ?? 'room interior' });
-  }
-  return urls;
 }
 
 
@@ -164,7 +149,7 @@ export default function AdminRoomsPage() {
     mode: 'onSubmit',
   });
 
-  const { isSubmitting } = form.formState;
+  const { isSubmitting, setIsSubmitting } = form.formState;
 
   const fetchManagerAndRooms = async () => {
     setIsLoading(true);
@@ -258,20 +243,32 @@ export default function AdminRoomsPage() {
       });
       return;
     }
+    
+    setIsSubmitting(true);
+    const imageUrls: UploadedImage[] = [];
 
     try {
-      const imageUrls = await uploadAllSerial(
-        values.images,
-        user.uid,
-        values.roomNumber,
-        (i, p) => {
-          setUploadProgresses((prev) => {
-            const arr = [...prev];
-            arr[i] = p;
-            return arr;
+      // Direct upload loop inside onSubmit
+      for (let i = 0; i < values.images.length; i++) {
+        const file = values.images[i];
+        const ext = file.type.includes('png') ? 'png' : file.type.includes('webp') ? 'webp' : 'jpg';
+        const filename = `${i + 1}_${Date.now()}.${ext}`;
+        const path = `rooms/${user.uid}/${clean(values.roomNumber)}/${filename}`;
+
+        try {
+          const url = await uploadResumable(file, path, (p) => {
+            setUploadProgresses((prev) => {
+              const newProgress = [...prev];
+              newProgress[i] = p;
+              return newProgress;
+            });
           });
+          imageUrls.push({ src: url, hint: imageHints[i] ?? 'room interior' });
+        } catch (error: any) {
+            // This is a specific error catch for the upload itself
+            throw new Error(`Failed to upload image ${i + 1}: ${error.code} - ${error.message}`);
         }
-      );
+      }
 
       const roomData = {
         managerUid: user.uid,
@@ -298,25 +295,21 @@ export default function AdminRoomsPage() {
       setUploadProgresses([]);
       setIsFormVisible(false);
       fetchManagerAndRooms();
+
     } catch (error: any) {
-        console.error('UPLOAD FAIL ->', error, error?.code, error?.customData);
         let description = 'Could not save the room. Check the console for details.';
-        if (error.code) {
-          switch (error.code) {
-            case 'storage/unauthorized':
-              description = "Permission Denied. This is likely an App Check or Storage Rules issue. Please verify your NEXT_PUBLIC_RECAPTCHA_SITE_KEY and Firebase console settings.";
-              break;
-            case 'storage/retry-limit-exceeded':
-              description = "Upload failed due to a network error. Please check your connection and try again.";
-              break;
-            case 'storage/quota-exceeded':
-              description = "You've exceeded your Firebase Storage quota. Please upgrade your plan or free up space.";
-              break;
-            default:
-              description = `An unexpected storage error occurred: ${error.code}`;
-          }
+        if (error.message.includes('storage/unauthorized')) {
+          description = "Permission Denied. This is likely an App Check or Storage Rules issue. Please verify your NEXT_PUBLIC_RECAPTCHA_SITE_KEY and Firebase console settings.";
+        } else if (error.message.includes('storage/retry-limit-exceeded')) {
+          description = "Upload failed due to a network error. Please check your connection and try again.";
+        } else if (error.message) {
+            description = error.message;
         }
+        
         toast({ variant: 'destructive', title: 'Upload Error', description, duration: 9000 });
+        console.error('UPLOAD FAIL ->', error);
+    } finally {
+        setIsSubmitting(false);
     }
   }
 
