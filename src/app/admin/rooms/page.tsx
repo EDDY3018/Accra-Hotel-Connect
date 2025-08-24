@@ -47,8 +47,6 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Edit, PlusCircle, Trash, Upload, Wifi, Wind, Tv, Zap, Bath, X } from 'lucide-react';
 
-import imageCompression from 'browser-image-compression';
-
 // ---------- Config & Helpers ----------
 const amenitiesList = [
   { id: 'wifi', label: 'Wi-Fi', icon: Wifi },
@@ -134,13 +132,7 @@ async function uploadAllSerial(
     const filename = `${i + 1}_${Date.now()}.${ext}`;
     const path = `rooms/${uid}/${clean(roomNumber)}/${filename}`;
     
-    const compressedFile = await imageCompression(f, {
-        maxWidthOrHeight: 1280,
-        maxSizeMB: 0.5,
-        useWebWorker: true,
-    });
-
-    const src = await uploadResumable(compressedFile, path, p => onEachProgress?.(i, p));
+    const src = await uploadResumable(f, path, p => onEachProgress?.(i, p));
     urls.push({ src, hint: imageHints[i] ?? 'room interior' });
   }
   return urls;
