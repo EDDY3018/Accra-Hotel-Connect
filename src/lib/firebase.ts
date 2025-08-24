@@ -20,14 +20,18 @@ const firebaseConfig = {
 // Initialize Database connection
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
-  try {
-    initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY),
-      isTokenAutoRefreshEnabled: true,
-    });
-  } catch (error) {
-    console.error("Failed to initialize App Check:", error);
+if (typeof window !== 'undefined') {
+  if (process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
+    try {
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY),
+        isTokenAutoRefreshEnabled: true,
+      });
+    } catch (error) {
+      console.error("Firebase App Check initialization failed. This can happen if the reCAPTCHA key is invalid or the domain is not authorized. Please check your Firebase project settings. Error: ", error);
+    }
+  } else {
+    console.warn("Firebase App Check is not initialized. Please set NEXT_PUBLIC_RECAPTCHA_SITE_KEY in your .env file for production security.");
   }
 }
 

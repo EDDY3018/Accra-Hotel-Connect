@@ -312,7 +312,7 @@ export default function AdminRoomsPage() {
         if (error.code) {
           switch (error.code) {
             case 'storage/unauthorized':
-              description = "Permission Denied. Please ensure you have the correct Firebase Storage rules and App Check is configured.";
+              description = "Permission Denied. This is likely an App Check or Storage Rules issue. Please verify your NEXT_PUBLIC_RECAPTCHA_SITE_KEY and Firebase console settings.";
               break;
             case 'storage/retry-limit-exceeded':
               description = "Upload failed due to a network error. Please check your connection and try again.";
