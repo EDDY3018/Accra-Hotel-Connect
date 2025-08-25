@@ -50,8 +50,8 @@ export default function Home() {
                     src="/images/main.jpeg"
                     alt="Hero Hostel"
                     width={600}
-                    height={400}
-                    className="mx-auto aspect-video overflow-hidden rounded-xl object-cover"
+                    height={500}
+                    className="mx-auto aspect-[6/5] overflow-hidden rounded-xl object-cover"
                     data-ai-hint="modern hostel exterior"
                   />
               </div>
