@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import imageCompression from 'browser-image-compression';
 
 import { auth, db, storage } from '@/lib/firebase';
 import {
@@ -299,9 +300,9 @@ export default function AdminRoomsPage() {
     } catch (error: any) {
         let description = 'Could not save the room. Check the console for details.';
         if (error.message.includes('storage/unauthorized')) {
-          description = "Permission Denied. This is likely an App Check or Storage Rules issue. Please verify your NEXT_PUBLIC_RECAPTCHA_SITE_KEY and Firebase console settings.";
+            description = "Permission Denied. This could be an App Check issue. Please verify your NEXT_PUBLIC_RECAPTCHA_SITE_KEY and Firebase console settings.";
         } else if (error.message.includes('storage/retry-limit-exceeded')) {
-          description = "Upload failed due to a network error. Please check your connection and try again.";
+            description = "Upload failed due to a network error. Please check your connection and try again.";
         } else if (error.message) {
             description = error.message;
         }

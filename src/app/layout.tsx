@@ -1,20 +1,26 @@
-import type {Metadata} from 'next';
+
+'use client';
+
+import { useEffect } from 'react';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-
-export const metadata: Metadata = {
-  title: 'AccraHostelConnect',
-  description: 'Your one-stop solution for hostel management.',
-};
+import { initializeFirebase } from '@/lib/firebase';
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  
+  useEffect(() => {
+    initializeFirebase();
+  }, []);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <title>AccraHostelConnect</title>
+        <meta name="description" content="Your one-stop solution for hostel management." />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=PT+Sans:wght@400;700&display=swap" rel="stylesheet" />
