@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link"
@@ -17,7 +18,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/co
 import { HostelIcon } from "./icons";
 import { cn } from "@/lib/utils";
 import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { getFirebaseAuth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 const navItems = [
@@ -31,6 +32,7 @@ export function StudentHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
+  const auth = getFirebaseAuth();
 
   const handleLogout = async () => {
     try {

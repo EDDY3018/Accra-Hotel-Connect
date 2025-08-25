@@ -44,7 +44,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import type { UserOptions } from 'jspdf-autotable';
 import Papa from 'papaparse';
-import { auth, db } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -81,6 +81,8 @@ export default function AdminStudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddStudentOpen, setAddStudentOpen] = useState(false);
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
 
   const form = useForm<z.infer<typeof addStudentSchema>>({
     resolver: zodResolver(addStudentSchema),
@@ -119,7 +121,7 @@ export default function AdminStudentsPage() {
           email: data.email || 'N/A',
           roomNumber: data.roomNumber || 'Unassigned',
           outstandingBalance: data.outstandingBalance || 0,
-          totalFee: data.totalFee || 0, // ✅ this comma was missing
+          totalFee: data.totalFee || 0,
         };
       });
       
@@ -143,7 +145,7 @@ export default function AdminStudentsPage() {
       else setIsLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [auth, db]);
 
 
   const handleExportCSV = () => {

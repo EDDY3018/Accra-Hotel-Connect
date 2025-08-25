@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from "next/link"
@@ -17,7 +18,7 @@ import { HostelIcon } from "@/components/icons"
 import { useToast } from "@/hooks/use-toast";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
 
 
 export default function LoginPage() {
@@ -26,6 +27,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();

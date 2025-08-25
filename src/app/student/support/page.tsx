@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { auth, db } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase';
 import { collection, addDoc, query, where, getDocs, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 
@@ -55,6 +55,8 @@ export default function SupportPage() {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("my-tickets");
+    const auth = getFirebaseAuth();
+    const db = getFirebaseDb();
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -63,36 +65,36 @@ export default function SupportPage() {
     
     const { isSubmitting } = form.formState;
 
-    const fetchTickets = async () => {
-        setIsLoading(true);
-        const user = auth.currentUser;
-        if (!user) {
-            setIsLoading(false);
-            return;
-        }
-
-        try {
-            const q = query(
-                collection(db, 'tickets'), 
-                where('studentUid', '==', user.uid),
-                orderBy('createdAt', 'desc')
-            );
-            const querySnapshot = await getDocs(q);
-            const userTickets = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ticket));
-            setTickets(userTickets);
-        } catch (error: any) {
-            console.error("Error fetching tickets:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your support tickets. See console for details.' });
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     useEffect(() => {
+      const fetchTickets = async () => {
+          setIsLoading(true);
+          const user = auth.currentUser;
+          if (!user) {
+              setIsLoading(false);
+              return;
+          }
+
+          try {
+              const q = query(
+                  collection(db, 'tickets'), 
+                  where('studentUid', '==', user.uid),
+                  orderBy('createdAt', 'desc')
+              );
+              const querySnapshot = await getDocs(q);
+              const userTickets = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ticket));
+              setTickets(userTickets);
+          } catch (error: any) {
+              console.error("Error fetching tickets:", error);
+              toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your support tickets. See console for details.' });
+          } finally {
+              setIsLoading(false);
+          }
+      };
+
       if (activeTab === "my-tickets") {
         fetchTickets();
       }
-    }, [activeTab]);
+    }, [activeTab, auth, db, toast]);
 
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -243,5 +245,3 @@ export default function SupportPage() {
     </Tabs>
   )
 }
-
-    

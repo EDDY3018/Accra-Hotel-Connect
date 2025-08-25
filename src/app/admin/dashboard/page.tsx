@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts"
 import { Users, BedDouble, BookCheck, LifeBuoy } from "lucide-react"
-import { auth, db } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +33,8 @@ export default function AdminDashboard() {
   const [ticketsData, setTicketsData] = useState<TicketsData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -130,7 +132,7 @@ export default function AdminDashboard() {
     });
 
     return () => unsubscribe();
-  }, [toast]);
+  }, [auth, db, toast]);
 
   if (isLoading) {
     return (

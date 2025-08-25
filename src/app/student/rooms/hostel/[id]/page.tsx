@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Bed, Filter } from "lucide-react"
 import { collection, getDocs, query, where } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { getFirebaseDb } from "@/lib/firebase"
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -38,6 +38,7 @@ export default function HostelRoomsPage({ params }: { params: { id: string } }) 
   const [expandedCategories, setExpandedCategories] = useState<{[key: string]: boolean}>({});
   const [selectedOccupancy, setSelectedOccupancy] = useState('all');
   const [selectedGender, setSelectedGender] = useState('all');
+  const db = getFirebaseDb();
 
 
   const toggleCategory = (key: string) => {
@@ -89,7 +90,7 @@ export default function HostelRoomsPage({ params }: { params: { id: string } }) 
     }
     
     getRooms();
-  }, [managerUid, hostelName]);
+  }, [managerUid, hostelName, db]);
 
   const groupedRooms = useMemo(() => {
     let filteredRooms = allRooms;

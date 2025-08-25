@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { auth, db } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -48,6 +48,8 @@ const passwordFormSchema = z.object({
 export default function AdminSettingsPage() {
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(true);
+    const auth = getFirebaseAuth();
+    const db = getFirebaseDb();
 
     const profileForm = useForm<z.infer<typeof profileFormSchema>>({
         resolver: zodResolver(profileFormSchema),
@@ -96,7 +98,7 @@ export default function AdminSettingsPage() {
             }
         });
         return () => unsubscribe();
-    }, [profileForm, toast]);
+    }, [auth, db, profileForm, toast]);
 
     async function onProfileSubmit(values: z.infer<typeof profileFormSchema>) {
         const user = auth.currentUser;
@@ -304,5 +306,3 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
-
-    

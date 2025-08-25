@@ -6,9 +6,7 @@ import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import imageCompression from 'browser-image-compression';
-
-import { auth, db, storage } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseDb, getFirebaseStorage } from '@/lib/firebase';
 import {
   ref as sRef,
   uploadBytesResumable,
@@ -85,9 +83,9 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 type UploadedImage = { src: string; hint: string };
 
-
 // ---------- Resumable Upload Helper ----------
 async function uploadResumable(
+  storage: ReturnType<typeof getFirebaseStorage>,
   file: File,
   path: string,
   onProgress?: (pct: number) => void
@@ -109,7 +107,7 @@ async function uploadResumable(
       },
       err => {
         console.error("Upload error in helper:", err.code, err.message);
-        reject(err); // Reject the promise on error
+        reject(err);
       },
       async () => {
         try {
@@ -135,6 +133,9 @@ export default function AdminRoomsPage() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [uploadProgresses, setUploadProgresses] = useState<number[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
+  const storage = getFirebaseStorage();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -150,7 +151,7 @@ export default function AdminRoomsPage() {
     mode: 'onSubmit',
   });
 
-  const { isSubmitting, setIsSubmitting } = form.formState;
+  const { formState: { isSubmitting }, } = form;
 
   const fetchManagerAndRooms = async () => {
     setIsLoading(true);
@@ -194,7 +195,7 @@ export default function AdminRoomsPage() {
       else setIsLoading(false);
     });
     return () => unsub();
-  }, []);
+  }, [auth, db]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newFiles = event.target.files;
@@ -245,11 +246,10 @@ export default function AdminRoomsPage() {
       return;
     }
     
-    setIsSubmitting(true);
+    form.control._options.context?.setIsSubmitting(true);
     const imageUrls: UploadedImage[] = [];
 
     try {
-      // Direct upload loop inside onSubmit
       for (let i = 0; i < values.images.length; i++) {
         const file = values.images[i];
         const ext = file.type.includes('png') ? 'png' : file.type.includes('webp') ? 'webp' : 'jpg';
@@ -257,7 +257,7 @@ export default function AdminRoomsPage() {
         const path = `rooms/${user.uid}/${clean(values.roomNumber)}/${filename}`;
 
         try {
-          const url = await uploadResumable(file, path, (p) => {
+          const url = await uploadResumable(storage, file, path, (p) => {
             setUploadProgresses((prev) => {
               const newProgress = [...prev];
               newProgress[i] = p;
@@ -266,7 +266,6 @@ export default function AdminRoomsPage() {
           });
           imageUrls.push({ src: url, hint: imageHints[i] ?? 'room interior' });
         } catch (error: any) {
-            // This is a specific error catch for the upload itself
             throw new Error(`Failed to upload image ${i + 1}: ${error.code} - ${error.message}`);
         }
       }
@@ -299,18 +298,18 @@ export default function AdminRoomsPage() {
 
     } catch (error: any) {
         let description = 'Could not save the room. Check the console for details.';
-        if (error.message.includes('storage/unauthorized')) {
+        if (error.code === 'storage/unauthorized' || error.message.includes('storage/unauthorized')) {
             description = "Permission Denied. This could be an App Check issue. Please verify your NEXT_PUBLIC_RECAPTCHA_SITE_KEY and Firebase console settings.";
-        } else if (error.message.includes('storage/retry-limit-exceeded')) {
+        } else if (error.code === 'storage/retry-limit-exceeded' || error.message.includes('storage/retry-limit-exceeded')) {
             description = "Upload failed due to a network error. Please check your connection and try again.";
         } else if (error.message) {
             description = error.message;
         }
         
         toast({ variant: 'destructive', title: 'Upload Error', description, duration: 9000 });
-        console.error('UPLOAD FAIL ->', error);
+        console.error('UPLOAD FAIL ->', error, error?.code);
     } finally {
-        setIsSubmitting(false);
+        form.control._options.context?.setIsSubmitting(false);
     }
   }
 

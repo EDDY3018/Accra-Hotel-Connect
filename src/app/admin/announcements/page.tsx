@@ -47,7 +47,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { auth, db } from "@/lib/firebase";
+import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, getDoc, doc, orderBy, updateDoc, deleteDoc } from 'firebase/firestore';
 
 const formSchema = z.object({
@@ -70,6 +70,8 @@ export default function AdminAnnouncementsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

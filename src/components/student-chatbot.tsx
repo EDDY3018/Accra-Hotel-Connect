@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -8,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageSquare, Send, X, Bot } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { studentChat } from '@/ai/flows/chat-flow';
-import { auth, db } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { Skeleton } from './ui/skeleton';
 
@@ -25,6 +26,8 @@ export function StudentChatbot() {
     const [userName, setUserName] = useState('');
     const [isGreetingLoading, setIsGreetingLoading] = useState(true);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
+    const auth = getFirebaseAuth();
+    const db = getFirebaseDb();
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -49,7 +52,7 @@ export function StudentChatbot() {
         if (isOpen && !userName) {
             fetchUserData();
         }
-    }, [isOpen, userName]);
+    }, [isOpen, userName, auth, db]);
 
     useEffect(() => {
         if (scrollAreaRef.current) {

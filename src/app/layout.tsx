@@ -1,20 +1,14 @@
 
 'use client';
 
-import { useEffect } from 'react';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { initializeFirebase } from '@/lib/firebase';
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  
-  useEffect(() => {
-    initializeFirebase();
-  }, []);
 
   return (
     <html lang="en" suppressHydrationWarning>

@@ -20,7 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Download, Loader2, Building, MapPin, Phone, Handshake } from "lucide-react"
-import { auth, db } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, getDoc, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dialog"
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { User } from 'firebase/auth';
 
 interface Transaction {
   id: string;
@@ -58,96 +59,98 @@ export default function PaymentsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userInfo, setUserInfo] = useState<{ fullName: string, studentId: string } | null>(null);
-
-  const fetchPaymentData = async (user: any) => {
-    setIsLoading(true);
-    try {
-      // Get user info
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-      if (userDocSnap.exists()) {
-        setUserInfo(userDocSnap.data() as { fullName: string, studentId: string });
-      }
-
-      // Fetch confirmed payments
-      const paymentsQuery = query(
-        collection(db, 'payments'), 
-        where('studentUid', '==', user.uid),
-        orderBy('paymentDate', 'desc')
-      );
-      const paymentsSnapshot = await getDocs(paymentsQuery);
-      const confirmedPaymentsPromises = paymentsSnapshot.docs.map(async (docSnap) => {
-        const data = docSnap.data();
-        let roomNumber = 'N/A', hostelName = 'N/A';
-        if (data.bookingId) {
-            const bookingRef = doc(db, 'bookings', data.bookingId);
-            const bookingSnap = await getDoc(bookingRef);
-            if (bookingSnap.exists()) {
-                const bookingData = bookingSnap.data();
-                roomNumber = bookingData.roomNumber;
-                hostelName = bookingData.hostelName;
-            }
-        }
-        return {
-          id: docSnap.id,
-          displayId: docSnap.id,
-          date: new Date(data.paymentDate.toDate()).toLocaleDateString(),
-          amount: data.amount,
-          status: 'Paid',
-          type: 'Payment',
-          roomNumber,
-          hostelName,
-        } as Transaction;
-      });
-      const confirmedPayments = await Promise.all(confirmedPaymentsPromises);
-
-      // Fetch pending bookings
-      const bookingsQuery = query(
-        collection(db, 'bookings'),
-        where('studentUid', '==', user.uid),
-        where('status', '==', 'Unpaid')
-      );
-      const bookingsSnapshot = await getDocs(bookingsQuery);
-      const pendingBookingsPromises = bookingsSnapshot.docs.map(async (docSnap) => {
-        const data = docSnap.data();
-        let managerInfo = null;
-        if(data.managerUid) {
-            const managerDocRef = doc(db, 'users', data.managerUid);
-            const managerDoc = await getDoc(managerDocRef);
-            if (managerDoc.exists()) {
-                const managerData = managerDoc.data();
-                managerInfo = {
-                    hostelName: managerData.hostelName,
-                    location: managerData.location,
-                    phone: managerData.phone
-                };
-            }
-        }
-        return {
-          id: docSnap.id,
-          displayId: docSnap.id,
-          date: new Date(data.bookingDate).toLocaleDateString(),
-          amount: data.price,
-          status: 'Pending',
-          type: 'Booking',
-          roomNumber: data.roomNumber,
-          hostelName: data.hostelName,
-          managerInfo,
-        } as Transaction;
-      });
-      const pendingBookings = await Promise.all(pendingBookingsPromises);
-      
-      setTransactions([...pendingBookings, ...confirmedPayments]);
-
-    } catch (error: any) {
-      console.error("Error fetching payment history: ", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your payment history. See console for details.' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
 
   useEffect(() => {
+    const fetchPaymentData = async (user: User) => {
+      setIsLoading(true);
+      try {
+        // Get user info
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          setUserInfo(userDocSnap.data() as { fullName: string, studentId: string });
+        }
+
+        // Fetch confirmed payments
+        const paymentsQuery = query(
+          collection(db, 'payments'), 
+          where('studentUid', '==', user.uid),
+          orderBy('paymentDate', 'desc')
+        );
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        const confirmedPaymentsPromises = paymentsSnapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data();
+          let roomNumber = 'N/A', hostelName = 'N/A';
+          if (data.bookingId) {
+              const bookingRef = doc(db, 'bookings', data.bookingId);
+              const bookingSnap = await getDoc(bookingRef);
+              if (bookingSnap.exists()) {
+                  const bookingData = bookingSnap.data();
+                  roomNumber = bookingData.roomNumber;
+                  hostelName = bookingData.hostelName;
+              }
+          }
+          return {
+            id: docSnap.id,
+            displayId: docSnap.id,
+            date: new Date(data.paymentDate.toDate()).toLocaleDateString(),
+            amount: data.amount,
+            status: 'Paid',
+            type: 'Payment',
+            roomNumber,
+            hostelName,
+          } as Transaction;
+        });
+        const confirmedPayments = await Promise.all(confirmedPaymentsPromises);
+
+        // Fetch pending bookings
+        const bookingsQuery = query(
+          collection(db, 'bookings'),
+          where('studentUid', '==', user.uid),
+          where('status', '==', 'Unpaid')
+        );
+        const bookingsSnapshot = await getDocs(bookingsQuery);
+        const pendingBookingsPromises = bookingsSnapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data();
+          let managerInfo = null;
+          if(data.managerUid) {
+              const managerDocRef = doc(db, 'users', data.managerUid);
+              const managerDoc = await getDoc(managerDocRef);
+              if (managerDoc.exists()) {
+                  const managerData = managerDoc.data();
+                  managerInfo = {
+                      hostelName: managerData.hostelName,
+                      location: managerData.location,
+                      phone: managerData.phone
+                  };
+              }
+          }
+          return {
+            id: docSnap.id,
+            displayId: docSnap.id,
+            date: new Date(data.bookingDate).toLocaleDateString(),
+            amount: data.price,
+            status: 'Pending',
+            type: 'Booking',
+            roomNumber: data.roomNumber,
+            hostelName: data.hostelName,
+            managerInfo,
+          } as Transaction;
+        });
+        const pendingBookings = await Promise.all(pendingBookingsPromises);
+        
+        setTransactions([...pendingBookings, ...confirmedPayments]);
+
+      } catch (error: any) {
+        console.error("Error fetching payment history: ", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your payment history. See console for details.' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchPaymentData(user);
@@ -156,7 +159,7 @@ export default function PaymentsPage() {
       }
     });
     return () => unsubscribe();
-  }, [toast]);
+  }, [auth, db, toast]);
 
   const handleGenerateReceipt = (payment: Transaction) => {
     if (!userInfo || payment.status !== 'Paid') {

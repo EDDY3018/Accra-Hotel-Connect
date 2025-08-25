@@ -23,7 +23,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import { auth, db } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertTriangle } from 'lucide-react';
@@ -42,6 +42,8 @@ export default function AdminCancellationsPage() {
   const { toast } = useToast();
   const [cancellations, setCancellations] = useState<Cancellation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
 
   const fetchCancellations = async () => {
     setIsLoading(true);
@@ -87,7 +89,7 @@ export default function AdminCancellationsPage() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [auth]);
 
 
   return (
@@ -135,5 +137,3 @@ export default function AdminCancellationsPage() {
     </Card>
   )
 }
-
-    

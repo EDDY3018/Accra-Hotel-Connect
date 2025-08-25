@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Search, MapPin } from "lucide-react"
 import { collection, getDocs, query, where } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { getFirebaseDb } from "@/lib/firebase"
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Hostel {
@@ -24,6 +24,7 @@ export default function HostelsPage() {
   const [allHostels, setAllHostels] = useState<Hostel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const db = getFirebaseDb();
 
   useEffect(() => {
     async function getHostels() {
@@ -59,7 +60,7 @@ export default function HostelsPage() {
         }
     }
     getHostels();
-  }, []);
+  }, [db]);
 
   const filteredHostels = useMemo(() => {
     if (!searchTerm) {

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bell, FileWarning, BedDouble, Building, MapPin, Phone, Handshake, XCircle, ChevronRight } from "lucide-react";
-import { auth, db } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, writeBatch, serverTimestamp, setDoc, collectionGroup } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -79,148 +79,150 @@ export default function StudentDashboardPage() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   const [hostels, setHostels] = useState<Hostel[]>([]);
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
   
-  const fetchUserData = async () => {
-      setIsLoading(true);
-      const user = auth.currentUser;
-      if (user) {
-        try {
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDoc = await getDoc(userDocRef);
+  useEffect(() => {
+    const fetchUserData = async () => {
+        setIsLoading(true);
+        const user = auth.currentUser;
+        if (user) {
+          try {
+            const userDocRef = doc(db, 'users', user.uid);
+            const userDoc = await getDoc(userDocRef);
 
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            const fullName = userData.fullName || '';
-            setUserName(fullName);
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              const fullName = userData.fullName || '';
+              setUserName(fullName);
 
-            if (userData.roomId) {
-              const roomDocRef = doc(db, 'rooms', userData.roomId);
-              const roomDoc = await getDoc(roomDocRef);
-              if (roomDoc.exists()) {
-                const roomData = roomDoc.data();
-                setRoomInfo({
-                  id: roomDoc.id,
-                  roomNumber: roomData.roomNumber || 'N/A',
-                  name: roomData.name || 'Room details not found'
-                });
+              if (userData.roomId) {
+                const roomDocRef = doc(db, 'rooms', userData.roomId);
+                const roomDoc = await getDoc(roomDocRef);
+                if (roomDoc.exists()) {
+                  const roomData = roomDoc.data();
+                  setRoomInfo({
+                    id: roomDoc.id,
+                    roomNumber: roomData.roomNumber || 'N/A',
+                    name: roomData.name || 'Room details not found'
+                  });
+                }
+              } else {
+                setRoomInfo(null);
               }
-            } else {
-              setRoomInfo(null);
-            }
-            
-            let bookingId = null;
-            let fetchedManagerInfo: ManagerInfo | null = null;
-            let managerUid: string | null = null;
-            if(userData.outstandingBalance > 0 || userData.roomId) {
-              const bookingsQuery = query(
-                collection(db, "bookings"), 
-                where("studentUid", "==", user.uid), 
-                where("status", "in", ["Unpaid", "Paid"]),
-                limit(1)
-              );
-              const querySnapshot = await getDocs(bookingsQuery);
-              if (!querySnapshot.empty) {
-                  const bookingDoc = querySnapshot.docs[0];
-                  const bookingData = bookingDoc.data();
-                  bookingId = bookingDoc.id;
-                  managerUid = bookingData.managerUid;
-                  const managerDocRef = doc(db, 'users', bookingData.managerUid);
-                  const managerDoc = await getDoc(managerDocRef);
-                  if (managerDoc.exists()) {
-                      const managerData = managerDoc.data();
-                      fetchedManagerInfo = {
-                          hostelName: managerData.hostelName,
-                          location: managerData.location,
-                          phone: managerData.phone
-                      };
-                      setManagerInfo({ name: managerData.fullName, hostel: managerData.hostelName });
-                  }
-              }
-            }
-
-            if (userData.outstandingBalance && userData.outstandingBalance > 0) {
-              setPaymentInfo({
-                balance: userData.outstandingBalance,
-                dueDate: userData.dueDate ? new Date(userData.dueDate).toLocaleDateString() : 'Not specified',
-                bookingId: bookingId,
-                managerInfo: fetchedManagerInfo,
-                managerUid: managerUid,
-              });
-            } else {
-              setPaymentInfo(null);
-            }
-
-            const associatedManagerUid = userData.managerUid || managerUid;
-            if (associatedManagerUid) {
-                const announcementsQuery = query(
-                    collection(db, 'announcements'),
-                    where('managerUid', '==', associatedManagerUid),
-                    where('status', '==', 'Published'),
-                    orderBy('createdAt', 'desc'),
-                    limit(5)
+              
+              let bookingId = null;
+              let fetchedManagerInfo: ManagerInfo | null = null;
+              let managerUid: string | null = null;
+              if(userData.outstandingBalance > 0 || userData.roomId) {
+                const bookingsQuery = query(
+                  collection(db, "bookings"), 
+                  where("studentUid", "==", user.uid), 
+                  where("status", "in", ["Unpaid", "Paid"]),
+                  limit(1)
                 );
-                const announcementsSnapshot = await getDocs(announcementsQuery);
-                const fetchedAnnouncements = announcementsSnapshot.docs.map(doc => {
-                    const data = doc.data();
-                    return {
-                        id: doc.id,
-                        title: data.title,
-                        content: data.content,
-                        date: data.createdAt?.toDate().toLocaleDateString() ?? 'N/A',
-                        author: data.author,
-                    }
-                });
-                setAnnouncements(fetchedAnnouncements);
-                
-                 if (!managerInfo && fetchedAnnouncements.length > 0) {
-                    const managerDocRef = doc(db, 'users', associatedManagerUid);
+                const querySnapshot = await getDocs(bookingsQuery);
+                if (!querySnapshot.empty) {
+                    const bookingDoc = querySnapshot.docs[0];
+                    const bookingData = bookingDoc.data();
+                    bookingId = bookingDoc.id;
+                    managerUid = bookingData.managerUid;
+                    const managerDocRef = doc(db, 'users', bookingData.managerUid);
                     const managerDoc = await getDoc(managerDocRef);
                     if (managerDoc.exists()) {
                         const managerData = managerDoc.data();
+                        fetchedManagerInfo = {
+                            hostelName: managerData.hostelName,
+                            location: managerData.location,
+                            phone: managerData.phone
+                        };
                         setManagerInfo({ name: managerData.fullName, hostel: managerData.hostelName });
                     }
                 }
-            } else {
-              setAnnouncements([]);
-            }
-          }
-        } catch (error: any) {
-            console.error("Error fetching user data:", error);
-            toast({ variant: 'destructive', title: 'Error loading dashboard', description: 'Could not fetch your data. See console for details.' });
-        } finally {
-            setIsLoading(false);
-        }
-      } else {
-        setIsLoading(false);
-      }
-    };
-    
-  const fetchHostels = async () => {
-        const roomsQuery = query(collection(db, 'rooms'), where('status', '==', 'Available'));
-        const roomSnapshot = await getDocs(roomsQuery);
-        const hostelsMap = new Map<string, Hostel>();
-        roomSnapshot.docs.forEach(doc => {
-            const data = doc.data();
-            const managerUid = data.managerUid;
-            if (!hostelsMap.has(managerUid)) {
-                hostelsMap.set(managerUid, {
-                    id: managerUid,
-                    name: data.hostelName || 'Unknown Hostel',
+              }
+
+              if (userData.outstandingBalance && userData.outstandingBalance > 0) {
+                setPaymentInfo({
+                  balance: userData.outstandingBalance,
+                  dueDate: userData.dueDate ? new Date(userData.dueDate).toLocaleDateString() : 'Not specified',
+                  bookingId: bookingId,
+                  managerInfo: fetchedManagerInfo,
+                  managerUid: managerUid,
                 });
+              } else {
+                setPaymentInfo(null);
+              }
+
+              const associatedManagerUid = userData.managerUid || managerUid;
+              if (associatedManagerUid) {
+                  const announcementsQuery = query(
+                      collection(db, 'announcements'),
+                      where('managerUid', '==', associatedManagerUid),
+                      where('status', '==', 'Published'),
+                      orderBy('createdAt', 'desc'),
+                      limit(5)
+                  );
+                  const announcementsSnapshot = await getDocs(announcementsQuery);
+                  const fetchedAnnouncements = announcementsSnapshot.docs.map(doc => {
+                      const data = doc.data();
+                      return {
+                          id: doc.id,
+                          title: data.title,
+                          content: data.content,
+                          date: data.createdAt?.toDate().toLocaleDateString() ?? 'N/A',
+                          author: data.author,
+                      }
+                  });
+                  setAnnouncements(fetchedAnnouncements);
+                  
+                   if (!managerInfo && fetchedAnnouncements.length > 0) {
+                      const managerDocRef = doc(db, 'users', associatedManagerUid);
+                      const managerDoc = await getDoc(managerDocRef);
+                      if (managerDoc.exists()) {
+                          const managerData = managerDoc.data();
+                          setManagerInfo({ name: managerData.fullName, hostel: managerData.hostelName });
+                      }
+                  }
+              } else {
+                setAnnouncements([]);
+              }
             }
-        });
-        setHostels(Array.from(hostelsMap.values()));
-  }
+          } catch (error: any) {
+              console.error("Error fetching user data:", error);
+              toast({ variant: 'destructive', title: 'Error loading dashboard', description: 'Could not fetch your data. See console for details.' });
+          } finally {
+              setIsLoading(false);
+          }
+        } else {
+          setIsLoading(false);
+        }
+      };
+      
+    const fetchHostels = async () => {
+          const roomsQuery = query(collection(db, 'rooms'), where('status', '==', 'Available'));
+          const roomSnapshot = await getDocs(roomsQuery);
+          const hostelsMap = new Map<string, Hostel>();
+          roomSnapshot.docs.forEach(doc => {
+              const data = doc.data();
+              const managerUid = data.managerUid;
+              if (!hostelsMap.has(managerUid)) {
+                  hostelsMap.set(managerUid, {
+                      id: managerUid,
+                      name: data.hostelName || 'Unknown Hostel',
+                  });
+              }
+          });
+          setHostels(Array.from(hostelsMap.values()));
+    }
 
-  const onPaymentModalClose = () => {
-    setIsPaymentModalOpen(false);
-    toast({
-        title: "Payment Pending",
-        description: "Your booking is awaiting payment confirmation from the hostel manager.",
-    });
-  }
+    const onPaymentModalClose = () => {
+      setIsPaymentModalOpen(false);
+      toast({
+          title: "Payment Pending",
+          description: "Your booking is awaiting payment confirmation from the hostel manager.",
+      });
+    }
 
-  useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(user => {
         if (user) {
             fetchUserData();
@@ -231,7 +233,7 @@ export default function StudentDashboardPage() {
     });
 
     return () => unsubscribe();
-  }, [toast]);
+  }, [auth, db, toast]);
   
   const handleCancelBooking = async () => {
       const user = auth.currentUser;
@@ -280,8 +282,14 @@ export default function StudentDashboardPage() {
 
           await batch.commit();
           toast({ title: 'Booking Cancelled', description: 'Your booking has been successfully cancelled.' });
-          fetchUserData(); // Refresh data
-          setCancellationReason('');
+          // Re-fetch data after cancellation
+          const userAuth = getFirebaseAuth().currentUser;
+          if(userAuth) {
+            // No direct way to call fetchUserData, so we reset state manually
+             setRoomInfo(null);
+             setPaymentInfo(null);
+             setCancellationReason('');
+          }
       } catch (error) {
           console.error("Error cancelling booking:", error);
           toast({ variant: 'destructive', title: 'Cancellation Failed', description: 'Could not cancel your booking. See console.' });
@@ -412,7 +420,7 @@ export default function StudentDashboardPage() {
                        </div>
                     </div>
                     <DialogFooter>
-                      <Button onClick={onPaymentModalClose}>Understood, Close</Button>
+                      <Button onClick={() => setIsPaymentModalOpen(false)}>Understood, Close</Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>

@@ -38,7 +38,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
 import { Skeleton } from "./ui/skeleton";
 
 
@@ -60,6 +60,8 @@ export function AdminSidebar() {
   const [userName, setUserName] = useState("Manager");
   const [userEmail, setUserEmail] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
 
   useEffect(() => {
     setIsLoading(true);
@@ -86,7 +88,7 @@ export function AdminSidebar() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [auth, db]);
 
   const handleLogout = async () => {
     if (auth.currentUser) {
@@ -168,5 +170,3 @@ export function AdminSidebar() {
     </Sidebar>
   );
 }
-
-    

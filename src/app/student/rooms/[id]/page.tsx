@@ -47,7 +47,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { doc, getDoc, writeBatch, collection } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { getFirebaseDb, getFirebaseAuth } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const amenitiesMap: { [key: string]: { icon: React.ElementType; text: string } } = {
@@ -86,6 +86,8 @@ export default function RoomDetailPage({ params }: { params: { id: string } }) {
   const [roomDetails, setRoomDetails] = useState<RoomDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasActiveBooking, setHasActiveBooking] = useState(false);
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
 
   const form = useForm<z.infer<typeof bookingFormSchema>>({
     resolver: zodResolver(bookingFormSchema),
@@ -138,7 +140,7 @@ export default function RoomDetailPage({ params }: { params: { id: string } }) {
     });
 
     return () => unsubscribe();
-  }, [id, form, toast]);
+  }, [id, form, toast, auth, db]);
 
   const { isSubmitting } = form.formState;
 

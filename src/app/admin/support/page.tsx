@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { auth, db } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase';
 import { collection, query, getDocs, orderBy, doc, updateDoc, serverTimestamp, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -44,6 +44,8 @@ export default function AdminSupportPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [responseTexts, setResponseTexts] = useState<{[key: string]: string}>({});
   const [isSubmitting, setIsSubmitting] = useState<{[key: string]: boolean}>({});
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
 
   const fetchTickets = async () => {
     setIsLoading(true);
@@ -83,7 +85,7 @@ export default function AdminSupportPage() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [auth, db]);
   
   const handleResponseChange = (ticketId: string, text: string) => {
     setResponseTexts(prev => ({...prev, [ticketId]: text}));

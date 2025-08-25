@@ -20,7 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Search, Loader2 } from "lucide-react"
-import { auth, db } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,8 @@ export default function AdminBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
 
   const fetchBookings = async () => {
     setIsLoading(true);
@@ -146,7 +148,7 @@ export default function AdminBookingsPage() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [auth]);
 
 
   return (

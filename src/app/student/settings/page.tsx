@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import { auth, db } from '@/lib/firebase';
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -24,6 +24,8 @@ const settingsSchema = z.object({
 export default function StudentSettingsPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
 
   const form = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
@@ -61,7 +63,7 @@ export default function StudentSettingsPage() {
       }
     });
     return () => unsubscribe();
-  }, [form, toast]);
+  }, [auth, db, form, toast]);
 
   async function onSubmit(values: z.infer<typeof settingsSchema>) {
     const user = auth.currentUser;
@@ -172,5 +174,3 @@ export default function StudentSettingsPage() {
     </Card>
   )
 }
-
-    

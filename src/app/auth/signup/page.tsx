@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { createUserWithEmailAndPassword, User } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
 
 const studentIdRegex = new RegExp(/^01(21|22|23|24|25)\d{4}[bhdBHD]$/);
 
@@ -43,6 +43,7 @@ export default function SignupPage() {
   const { isSubmitting } = form.formState;
 
   const createUserProfile = async (user: User, additionalData: any) => {
+    const db = getFirebaseDb();
     const userRef = doc(db, "users", user.uid);
     const docSnap = await getDoc(userRef);
 
@@ -58,6 +59,7 @@ export default function SignupPage() {
   }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    const auth = getFirebaseAuth();
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       await createUserProfile(userCredential.user, { fullName: values.fullName, phone: values.phone, studentId: values.studentId });
