@@ -1,41 +1,259 @@
 
-import Image from "next/image"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
-import { CheckCircle2, Wifi, Wind, Bath, Tv, Zap, Users, Building, MapPin, Phone } from "lucide-react"
-import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { useToast } from '@/hooks/use-toast';
+import {
+  CheckCircle2,
+  Wifi,
+  Wind,
+  Bath,
+  Tv,
+  Zap,
+  Users,
+  Building,
+  MapPin,
+  Phone,
+  AlertCircle,
+} from 'lucide-react';
+import { doc, getDoc, writeBatch, collection } from 'firebase/firestore';
+import { getFirebaseDb, getFirebaseAuth } from '@/lib/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const amenitiesMap: { [key: string]: { icon: React.ElementType; text: string } } = {
-  wifi: { icon: Wifi, text: "High-speed Wi-Fi" },
-  ac: { icon: Wind, text: "Air Conditioning" },
-  bathroom: { icon: Bath, text: "Private Bathroom" },
-  tv: { icon: Tv, text: "Flat-screen TV" },
-  electricity: { icon: Zap, text: "Prepaid Electricity" },
+  wifi: { icon: Wifi, text: 'High-speed Wi-Fi' },
+  ac: { icon: Wind, text: 'Air Conditioning' },
+  bathroom: { icon: Bath, text: 'Private Bathroom' },
+  tv: { icon: Tv, text: 'Flat-screen TV' },
+  electricity: { icon: Zap, text: 'Prepaid Electricity' },
 };
 
-async function getRoomDetails(id: string) {
-    try {
+const bookingFormSchema = z.object({
+  fullName: z.string().min(1, 'Full name is required.'),
+  email: z.string().email('Please enter a valid email.'),
+});
+
+type RoomDetails = {
+  id: string;
+  name: string;
+  description: string;
+  amenities: string[];
+  occupancy: string;
+  images: { src: string; hint: string }[];
+  hostelName: string;
+  location: string;
+  managerPhone: string;
+  roomNumber: string;
+  price: number;
+  status: 'Available' | 'Occupied';
+  managerUid: string;
+};
+
+export default function RoomDetailPage({ params }: { params: { id: string } }) {
+  const router = useRouter();
+  const { id } = params;
+  const { toast } = useToast();
+  const [roomDetails, setRoomDetails] = useState<RoomDetails | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasActiveBooking, setHasActiveBooking] = useState(false);
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
+
+  const form = useForm<z.infer<typeof bookingFormSchema>>({
+    resolver: zodResolver(bookingFormSchema),
+    defaultValues: {
+      fullName: '',
+      email: '',
+    },
+  });
+
+  useEffect(() => {
+    async function getRoomDetails() {
+      if (!id) return;
+      setIsLoading(true);
+      try {
         const roomRef = doc(db, 'rooms', id);
         const roomSnap = await getDoc(roomRef);
 
         if (roomSnap.exists()) {
-            return { id: roomSnap.id, ...roomSnap.data() };
+          setRoomDetails({ id: roomSnap.id, ...roomSnap.data() } as RoomDetails);
         } else {
-            return null;
+            toast({ variant: 'destructive', title: 'Error', description: 'Room not found.' });
         }
-    } catch (error) {
-        console.error("Error fetching room details:", error);
-        return null;
+      } catch (error: any) {
+        console.error('Error fetching room details:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error fetching room',
+          description: 'Could not fetch room details. See console.',
+        });
+      }
     }
-}
 
-export default async function RoomDetailPage({ params }: { params: { id: string } }) {
-  const roomDetails = await getRoomDetails(params.id);
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          form.reset({
+            fullName: userData.fullName || '',
+            email: user.email || '',
+          });
+          // Check if user already has a room
+          if (userData.roomId) {
+            setHasActiveBooking(true);
+          }
+        }
+      }
+      getRoomDetails().finally(() => setIsLoading(false));
+    });
+
+    return () => unsubscribe();
+  }, [id, form, toast, auth, db]);
+
+  const { isSubmitting } = form.formState;
+
+  async function onSubmit(values: z.infer<typeof bookingFormSchema>) {
+    const user = auth.currentUser;
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Not Authenticated', description: 'You must be logged in to book a room.' });
+      return;
+    }
+    if (!roomDetails) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Room details not available.' });
+        return;
+    }
+    if (roomDetails.status !== 'Available') {
+        toast({ variant: 'destructive', title: 'Room Not Available', description: 'This room has already been booked.' });
+        return;
+    }
+     if (hasActiveBooking) {
+        toast({ variant: 'destructive', title: 'Active Booking Found', description: 'You already have an active booking and cannot book another room.' });
+        return;
+    }
+
+    try {
+        const batch = writeBatch(db);
+        const bookingDate = new Date();
+
+        // 1. Create the booking document
+        const bookingRef = doc(db, 'bookings', `${user.uid}_${roomDetails.id}`);
+        batch.set(bookingRef, {
+            studentUid: user.uid,
+            studentName: values.fullName,
+            roomId: roomDetails.id,
+            roomNumber: roomDetails.roomNumber,
+            hostelName: roomDetails.hostelName,
+            price: roomDetails.price,
+            managerUid: roomDetails.managerUid,
+            bookingDate: bookingDate.toISOString(),
+            status: 'Unpaid'
+        });
+
+        // 2. Update the user's profile with booking info
+        const userRef = doc(db, 'users', user.uid);
+        batch.update(userRef, {
+            roomId: roomDetails.id,
+            roomNumber: roomDetails.roomNumber,
+            outstandingBalance: roomDetails.price,
+            dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+            managerUid: roomDetails.managerUid
+        });
+
+        // 3. Create the email document for the Trigger Email extension
+        const mailRef = doc(collection(db, 'mail'));
+        batch.set(mailRef, {
+            to: values.email,
+            template: {
+                name: 'bookingConfirmation',
+                data: {
+                    studentName: values.fullName,
+                    roomNumber: roomDetails.roomNumber,
+                    price: roomDetails.price.toFixed(2),
+                    hostelName: roomDetails.hostelName,
+                    hostelLocation: roomDetails.location,
+                    hostelPhone: roomDetails.managerPhone,
+                    bookingDate: bookingDate.toLocaleDateString(),
+                    bookingId: bookingRef.id,
+                }
+            }
+        });
+        
+        await batch.commit();
+
+        toast({ title: 'Booking Successful!', description: "Your room has been secured. A confirmation email is on its way. Redirecting..." });
+        router.push('/student/dashboard');
+
+    } catch (error: any) {
+        console.error("Error booking room:", error);
+        let description = 'Could not complete the booking. Please check the console for more details.';
+        if (error.code && error.code.includes('permission-denied')) {
+            description = 'Permission denied. Please check your Firestore security rules.';
+        }
+        toast({ variant: 'destructive', title: 'Booking Failed', description });
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+        <div className="space-y-6">
+          <Skeleton className="aspect-video w-full rounded-lg" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-1/3" />
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-4/5" />
+          </div>
+          <div className="space-y-4">
+             <Skeleton className="h-8 w-1/4" />
+             <div className="grid grid-cols-2 gap-4">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+             </div>
+          </div>
+        </div>
+        <div>
+          <Card>
+            <CardHeader><Skeleton className="h-12 w-full" /></CardHeader>
+            <CardContent><Skeleton className="h-40 w-full" /></CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   if (!roomDetails) {
     return (
@@ -47,7 +265,8 @@ export default async function RoomDetailPage({ params }: { params: { id: string 
   }
 
   const roomAmenities = roomDetails.amenities?.map((key: string) => amenitiesMap[key]).filter(Boolean) || [];
-  
+  const isBookable = !isSubmitting && roomDetails.status === 'Available' && !hasActiveBooking;
+
   return (
     <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
       <div className="space-y-6">
@@ -62,6 +281,7 @@ export default async function RoomDetailPage({ params }: { params: { id: string 
                             height={400}
                             className="aspect-video object-cover rounded-lg"
                             data-ai-hint={image.hint}
+                            priority={index === 0}
                         />
                     </CarouselItem>
                 ))}
@@ -109,28 +329,57 @@ export default async function RoomDetailPage({ params }: { params: { id: string 
                         <CardTitle className="font-headline text-3xl">{roomDetails.name}</CardTitle>
                         <CardDescription>Room ID: {roomDetails.roomNumber}</CardDescription>
                     </div>
-                    <Badge variant={roomDetails.status === 'Available' ? 'default' : 'secondary'}>
+                    <Badge variant={roomDetails.status === 'Available' ? 'default' : 'destructive'}>
                         {roomDetails.status}
                     </Badge>
                 </div>
-                <p className="font-semibold text-3xl pt-4">GHS {roomDetails.price}<span className="text-lg font-normal text-muted-foreground">/year</span></p>
+                <p className="font-semibold text-3xl pt-4">GHS {roomDetails.price.toFixed(2)}<span className="text-lg font-normal text-muted-foreground">/year</span></p>
             </CardHeader>
             <CardContent>
-                <form className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="full-name">Full Name</Label>
-                        <Input id="full-name" placeholder="Your full name" />
+                {hasActiveBooking && (
+                    <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-md mb-4">
+                       <AlertCircle className="w-5 h-5 mt-0.5 text-yellow-600"/>
+                       <div className="flex-1">
+                          <h4 className="font-semibold">You have an active booking</h4>
+                          <p className="text-xs">You must complete payment for your current room before booking another.</p>
+                       </div>
                     </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="email">Email Address</Label>
-                        <Input id="email" type="email" placeholder="your.email@university.edu" />
-                    </div>
-                    <Button size="lg" className="w-full text-lg" disabled={roomDetails.status !== 'Available'}>
-                        <CheckCircle2 className="mr-2 h-5 w-5"/>
-                        {roomDetails.status === 'Available' ? 'Book Now' : 'Occupied'}
-                    </Button>
-                    <p className="text-xs text-center text-muted-foreground">By booking, you agree to the terms and conditions.</p>
-                </form>
+                )}
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="fullName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Full Name</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} readOnly disabled />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="email"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Email Address</FormLabel>
+                                    <FormControl>
+                                        <Input type="email" {...field} readOnly disabled />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <Button type="submit" size="lg" className="w-full text-lg" disabled={!isBookable}>
+                            <CheckCircle2 className="mr-2 h-5 w-5"/>
+                            {isSubmitting ? 'Booking...' : !isBookable && roomDetails.status !== 'Available' ? 'Occupied' : 'Book Now'}
+                        </Button>
+                        <p className="text-xs text-center text-muted-foreground">By booking, you agree to the terms and conditions.</p>
+                    </form>
+                </Form>
             </CardContent>
         </Card>
       </div>

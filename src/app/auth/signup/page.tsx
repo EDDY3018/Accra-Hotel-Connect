@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from "next/link"
@@ -13,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { createUserWithEmailAndPassword, User } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
 
 const studentIdRegex = new RegExp(/^01(21|22|23|24|25)\d{4}[bhdBHD]$/);
 
@@ -23,7 +24,12 @@ const formSchema = z.object({
   studentId: z.string().regex(studentIdRegex, { message: "Invalid Student ID format." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match.",
+  path: ["confirmPassword"],
 });
+
 
 export default function SignupPage() {
   const router = useRouter();
@@ -31,12 +37,13 @@ export default function SignupPage() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { fullName: "", phone: "", studentId: "", email: "", password: "" },
+    defaultValues: { fullName: "", phone: "", studentId: "", email: "", password: "", confirmPassword: "" },
   });
   
   const { isSubmitting } = form.formState;
 
   const createUserProfile = async (user: User, additionalData: any) => {
+    const db = getFirebaseDb();
     const userRef = doc(db, "users", user.uid);
     const docSnap = await getDoc(userRef);
 
@@ -52,6 +59,7 @@ export default function SignupPage() {
   }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    const auth = getFirebaseAuth();
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       await createUserProfile(userCredential.user, { fullName: values.fullName, phone: values.phone, studentId: values.studentId });
@@ -89,6 +97,9 @@ export default function SignupPage() {
               )} />
               <FormField control={form.control} name="password" render={({ field }) => (
                 <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+               <FormField control={form.control} name="confirmPassword" render={({ field }) => (
+                <FormItem><FormLabel>Confirm Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting ? "Creating Account..." : "Create an account"}</Button>
             </form>

@@ -31,7 +31,7 @@ export default function Home() {
             <div className="grid max-w-[1300px] mx-auto gap-4 px-4 sm:px-6 md:px-10 md:grid-cols-2 md:gap-16">
               <div className="flex flex-col justify-center space-y-4">
                 <h1 className="lg:leading-tighter text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl xl:text-[3.4rem] 2xl:text-[3.75rem] font-headline text-primary">
-                  Find Your Perfect Hostel in Accra
+                  Find your perfect hostel around ATU
                 </h1>
                 <p className="mx-auto max-w-[700px] text-foreground/80 md:text-xl">
                   AccraHostelConnect streamlines your student living experience. Easily browse, book, and manage your stay.
@@ -41,17 +41,17 @@ export default function Home() {
                     <Link href="/auth/signup" prefetch={false}>Get Started</Link>
                   </Button>
                   <Button asChild variant="secondary" size="lg">
-                     <Link href="/student/rooms" prefetch={false}>Browse Rooms</Link>
+                     <Link href="/student/rooms" prefetch={false}>Browse Hostels</Link>
                   </Button>
                 </div>
               </div>
               <div className="relative flex items-center justify-center">
                  <Image
-                    src="/images/hostel.jpg"
+                    src="/images/main.jpeg"
                     alt="Hero Hostel"
                     width={600}
-                    height={400}
-                    className="mx-auto aspect-video overflow-hidden rounded-xl object-cover"
+                    height={500}
+                    className="mx-auto aspect-[6/5] overflow-hidden rounded-xl object-cover"
                     data-ai-hint="modern hostel exterior"
                   />
               </div>

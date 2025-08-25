@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from "next/link";
@@ -15,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { HostelIcon } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { getFirebaseAuth } from "@/lib/firebase";
 import { ArrowLeft } from "lucide-react";
 
 export default function ForgotPasswordPage() {
@@ -23,6 +24,7 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
+  const auth = getFirebaseAuth();
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link"
@@ -17,12 +18,12 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/co
 import { HostelIcon } from "./icons";
 import { cn } from "@/lib/utils";
 import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { getFirebaseAuth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 const navItems = [
     { href: "/student/dashboard", icon: Home, label: "Dashboard" },
-    { href: "/student/rooms", icon: BedDouble, label: "Rooms" },
+    { href: "/student/rooms", icon: BedDouble, label: "Hostels" },
     { href: "/student/payments", icon: Wallet, label: "Payments" },
     { href: "/student/support", icon: LifeBuoy, label: "Support" },
 ];
@@ -31,6 +32,7 @@ export function StudentHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
+  const auth = getFirebaseAuth();
 
   const handleLogout = async () => {
     try {
